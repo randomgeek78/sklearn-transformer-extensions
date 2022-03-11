@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "sklearn-transformer-extensions"
+version = "0.1.7"
+description = """\
+Some scikit-learn transformer extensions to make using pandas dataframes in \
+scikit-learn pipelines easier."""
+authors = ["Random Geek <randomgeek78@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+scikit-learn = "^1.0.2"
+pandas = "^1.4.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+ipython = "^8.1.1"
+line-profiler = "^3.4.0"
+pytest-datadir = "^1.3.1"
+ipdb = "^0.13.9"
+pdbpp = "^0.10.3"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+include = ["d2l"]
+venv = ".venv"
+venvPath = "."
+
+stubPath = "./typings"
+
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportPrivateImportUsage = false
+
+pythonVersion = "3.8"
+pythonPlatform = "Linux"
+
+executionEnvironments = [{ root = "./sklearn_transformer_extensions" }]
+
+[tool.yapf]
+split_before_named_assigns=false
+allow_split_before_dict_value=false
+column_limit=80
+
+# https://github.com/pytest-dev/pytest/blob/main/pyproject.toml
+# https://github.com/pytest-dev/pytest/issues/2064#issuecomment-421812955
+[tool.pytest.ini_options]
+addopts="--pdbcls=IPython.terminal.debugger:TerminalPdb"
