@@ -260,8 +260,6 @@ class FunctionTransformer(_FunctionTransformer):
             col_name = list(col_name)
         self.col_name = col_name
 
-        self.params = None
-
     def fit(self, X, y=None, **fit_params):
         super().fit(X, y, **fit_params)
         if self.fit_fn is not None:
