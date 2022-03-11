@@ -20,7 +20,7 @@ from sklearn_transformer_extensions import make_column_transformer
 
 
 def test_version():
-    assert __version__ == '0.1.7'
+    assert __version__ == '0.1.8'
 
 
 @pytest.fixture
