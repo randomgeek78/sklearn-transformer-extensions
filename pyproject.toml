@@ -24,7 +24,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-include = ["d2l"]
+include = ["./sklearn_transformer_extensions"]
 venv = ".venv"
 venvPath = "."
 
@@ -37,14 +37,12 @@ reportPrivateImportUsage = false
 pythonVersion = "3.8"
 pythonPlatform = "Linux"
 
-executionEnvironments = [{ root = "./sklearn_transformer_extensions" }]
+executionEnvironments = [{ root = "." }]
 
 [tool.yapf]
 split_before_named_assigns=false
 allow_split_before_dict_value=false
 column_limit=80
 
-# https://github.com/pytest-dev/pytest/blob/main/pyproject.toml
-# https://github.com/pytest-dev/pytest/issues/2064#issuecomment-421812955
 [tool.pytest.ini_options]
 addopts="--pdbcls=IPython.terminal.debugger:TerminalPdb"
