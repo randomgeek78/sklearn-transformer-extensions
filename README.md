@@ -37,19 +37,25 @@ In this example, we create a end-to-end example using an example from [Practical
 ... Trent,C,Y,75,33,No
 ... """))
 
+```
+
 The train data structure contains both features and labels. They are kept
 together in our workflow.
 
+```
 >>> train.head(2)
     Name OverallGrade Obedient  ResearchScore  ProjectScore Recommend
 0  Henry            A        Y             90            85       Yes
 1   John            C        N             85            51       Yes
+
+```
 
 The XyAdapter internally splits X and y and forwards them to whatever is the
 underlying transformer instance. It then joins the the transformed X features
 and the original y labels and returns the combined Xy. This way, externally,
 the Xy are always kept together.
 
+```python
 >>> ct = XyAdapter(
 ...     make_column_transformer(
 ...         (StandardScaler(), ["ResearchScore", "ProjectScore"]),
@@ -71,21 +77,36 @@ the Xy are always kept together.
 >>> print(all(train['Recommend'] == train_['Recommend']))
 True
 
+```
+
 XyAdapter is also used on estimators just like with transformers
 
+```python
 >>> lr = XyAdapter(LogisticRegression(), target_col='Recommend')
 
+```
+
 The transformed features can be directly used to fit the estimator.
+
+```python
 >>> lr.fit(train_)
 LogisticRegression()
 >>> lr.predict_proba(train_)[:, 1].sum()
 3.000028844251478
 
+```
+
 Or we can create a pipeline with adapted instances
+
+```python
 >>> p = make_pipeline(ct, lr)
+
+```
 
 The pipeline is fitted as usual. Note that no labels are provided, i.e. y=None.
 The input is expected to contain both X and y.
+
+```python
 >>> p = p.fit(train)
 >>> p[:-1].transform(train).head(2)
    ResearchScore  ProjectScore  ...  Obedient_Y  Recommend
