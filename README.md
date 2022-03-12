@@ -42,7 +42,7 @@ In this example, we create a end-to-end example using an example from [Practical
 The train data structure contains both features and labels. They are kept
 together in our workflow.
 
-```
+```python
 >>> train.head(2)
     Name OverallGrade Obedient  ResearchScore  ProjectScore Recommend
 0  Henry            A        Y             90            85       Yes
