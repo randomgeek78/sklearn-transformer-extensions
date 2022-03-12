@@ -11,11 +11,14 @@ homepage = "https://github.com/randomgeek78/sklearn-transformer-extensions"
 python = "^3.8"
 scikit-learn = "^1.0.2"
 pandas = "^1.4.1"
+joblib = "^1.1.0"
+numpy = "^1.22.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 ipython = "^8.1.1"
 ipdb = "^0.13.9"
+numpy = "^1.22.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -25,8 +28,6 @@ build-backend = "poetry.core.masonry.api"
 include = ["./sklearn_transformer_extensions"]
 venv = ".venv"
 venvPath = "."
-
-stubPath = "./typings"
 
 reportMissingImports = true
 reportMissingTypeStubs = false
