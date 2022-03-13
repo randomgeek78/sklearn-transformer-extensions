@@ -1,14 +1,15 @@
 # sklearn-transformer-extensions
 
 This python package attempts to make building end-to-end pipelines using
-scikit-learn easier and more intuitive. It provides a collection of new classes
-and drop-in replacements to some existing scikit-learn classes that work
-together to make it very easy to build very sophisticated pipelines with ease.
-Besides, there are no functional limitations to using this new workflow.
+`scikit-learn` easier and more intuitive. It provides a collection of new
+classes and drop-in replacements to some existing `scikit-learn` classes that
+work together to make it very easy to build very sophisticated pipelines with
+ease. Besides, there are no functional limitations to using this new workflow.
 
 The pain points that the package addresses are:
-- Keeping the features and labels separate. This makes it impossible to remove
-  outliers from the training data as part of an integrated pipeline.
+- `scikit-learn` API keeps the features and labels separate. This makes it
+  impossible to remove outliers from the training data as part of an integrated
+  pipeline using the standard `scikit-learn` API.
 - Cumbersome to create new features while also retaining old features with
   their original feature names, i.e. not prefixing them to avoid name clashes.
   See note.
@@ -47,8 +48,8 @@ This package explores the following ideas:
 
 ## Example workflow
 
-### Note on why it is cumbersome to implement new features while retaining old
-features in the current `ColumnTransformer` implementation
+### Note on why it is cumbersome to implement new features while retaining old \
+  features in the current `ColumnTransformer` implementation
 
 Prefixing can be messy and lead to duplicate columns when the original features
 need to be retained. This is because `ColumnTransformer` assumes that if a
