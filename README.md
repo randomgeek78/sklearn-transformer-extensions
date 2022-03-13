@@ -1,121 +1,64 @@
 # sklearn-transformer-extensions
 
 This python package attempts to make building end-to-end pipelines using
-scikit-learn and pandas DataFrames easier and more intuitive. It provides a
-collection of new classes and drop-in replacements of some existing
-scikit-learn classes that work together to make it very easy to build very
-sophisticated scikit-learn pipelines with ease. Besides, there are no
-functional limitations to using this new workflow - anything that can be
-achieved with the original scikit-learn API like cross-validation, grid-search,
-etc - is also achievable with this new work. 
+scikit-learn easier and more intuitive. It provides a collection of new classes
+and drop-in replacements to some existing scikit-learn classes that work
+together to make it very easy to build very sophisticated pipelines with ease.
+Besides, there are no functional limitations to using this new workflow.
+
+The pain points that the package addresses are:
+- Keeping the features and labels separate. This makes it impossible to remove
+  outliers from the training data as part of an integrated pipeline.
+- Cumbersome to create new features while also retaining old features with
+  their original feature names, i.e. not prefixing them to avoid name clashes.
+  See note.
+
+In practice, these pain points make it very difficult to write complex
+end-to-end pipelines that do everything from filtering to feature engineering
+to model tuning using cross-validation while also being easy and intuitive to
+build.
+
+This package explores the following ideas:
+- Keep the features (X) and labels (y) together and pass them around together.
+  The combined (X, y) data structure is received by an adapter (`XyAdapter`) that
+  interfaces with an underlying transformer or estimator instance. All method
+  calls to the adapter are transparently forwarded to the underlying
+  transformer/estimator. But before forwarding the incoming data (the joint (X,
+  y) datastructure) to the underlying transformer/estimator, the data is split
+  into X and y and the split data is passed on as separate arguments. In order
+  to filter outliers or other data-points from training but not during test, we
+  can create a transformer that implements the filtering logic in its
+  `fit_transform` method. This transformer will not be couched within the
+  `XyAdapter` and will receive the joint (X, y) datastructure as a whole. Any
+  row-filtering operations it performs will be performed on both the features
+  and labels.
+- A modified `ColumnTransformer` implementation that does not relinquish
+  responsibility for all columns that are fed to one or more transformer
+  pipelines. Introduces a new `get_feature_names_used` mechanism for
+  transformers to let `ColumnTransformer` know which of the input columns it
+  wants to be responsible for. Only columns that the transformer takes
+  responsibility for are removed from the remainder list. For all other columns
+  that were provided to the transformer, responsibility continues to rest with
+  `ColumnTransformer` and these columns are not removed from the 'remainder'
+  mechanism. If a transformer does not implement the `get_feature_names_used`
+  method, then we assume that the transformer has taken responsibility for all
+  the columns that were sent to it, which defaults to the current behaviour in
+  `ColumnTransformer`.
 
 ## Example workflow
 
-In this example, we create a end-to-end example using an example from [Practical Machine Learning with Python](https://github.com/dipanjanS/practical-machine-learning-with-python/blob/master/notebooks/Ch01_Machine_Learning_Basics/Predicting%20Student%20Recommendation%20Machine%20Learning%20Pipeline.ipynb)
+### Note on why it is cumbersome to implement new features while retaining old
+features in the current `ColumnTransformer` implementation
 
-```python
->>> import pandas as pd
->>> from io import StringIO
->>> from sklearn.compose import make_column_transformer
->>> from sklearn.linear_model import LogisticRegression
->>> from sklearn.preprocessing import OneHotEncoder
->>> from sklearn.preprocessing import StandardScaler
->>> from sklearn.pipeline import make_pipeline
-
->>> from sklearn_transformer_extensions import XyAdapter
-
->>> train: pd.DataFrame = pd.read_csv(  # type: ignore
-...     StringIO("""
-... Name,OverallGrade,Obedient,ResearchScore,ProjectScore,Recommend
-... Henry,A,Y,90,85,Yes
-... John,C,N,85,51,Yes
-... David,F,N,10,17,No
-... Holmes,B,Y,75,71,No
-... Marvin,E,N,20,30,No
-... Simon,A,Y,92,79,Yes
-... Robert,B,Y,60,59,No
-... Trent,C,Y,75,33,No
-... """))
-
-```
-
-The train data structure contains both features and labels. They are kept
-together in our workflow.
-
-```python
->>> train.head(2)
-    Name OverallGrade Obedient  ResearchScore  ProjectScore Recommend
-0  Henry            A        Y             90            85       Yes
-1   John            C        N             85            51       Yes
-
-```
-
-The XyAdapter internally splits X and y and forwards them to whatever is the
-underlying transformer instance. It then joins the the transformed X features
-and the original y labels and returns the combined Xy. This way, externally,
-the Xy are always kept together.
-
-```python
->>> ct = XyAdapter(
-...     make_column_transformer(
-...         (StandardScaler(), ["ResearchScore", "ProjectScore"]),
-...         (OneHotEncoder(handle_unknown='ignore'), ['OverallGrade', 'Obedient']),
-...         verbose_feature_names_out=False,
-...     ), target_col='Recommend')
-
->>> train_ = ct.fit_transform(train)
->>> train_.head(2)
-   ResearchScore  ProjectScore  ...  Obedient_Y  Recommend
-0       0.899583      1.376650  ...         1.0        Yes
-1       0.730648     -0.091777  ...         0.0        Yes
-<BLANKLINE>
-[2 rows x 10 columns]
-
->>> train.shape, train_.shape
-((8, 6), (8, 10))
-
->>> print(all(train['Recommend'] == train_['Recommend']))
-True
-
-```
-
-XyAdapter is also used on estimators just like with transformers
-
-```python
->>> lr = XyAdapter(LogisticRegression(), target_col='Recommend')
-
-```
-
-The transformed features can be directly used to fit the estimator.
-
-```python
->>> lr.fit(train_)
-LogisticRegression()
->>> lr.predict_proba(train_)[:, 1].sum()
-3.000028844251478
-
-```
-
-Or we can create a pipeline with adapted instances
-
-```python
->>> p = make_pipeline(ct, lr)
-
-```
-
-The pipeline is fitted as usual. Note that no labels are provided, i.e. y=None.
-The input is expected to contain both X and y.
-
-```python
->>> p = p.fit(train)
->>> p[:-1].transform(train).head(2)
-   ResearchScore  ProjectScore  ...  Obedient_Y  Recommend
-0       0.899583      1.376650  ...         1.0        Yes
-1       0.730648     -0.091777  ...         0.0        Yes
-<BLANKLINE>
-[2 rows x 10 columns]
-
->>> p.predict_proba(train)[:, 1].sum()
-3.000028844251478
-
-```
+Prefixing can be messy and lead to duplicate columns when the original features
+need to be retained. This is because `ColumnTransformer` assumes that if a
+column is used to feed one or more transformer pipelines then these columns are
+'owned' by the pipelines and surfacing them again if needed is the pipeline's
+responsibility. But this problematic when a could is fed to multiple pipelines.
+Avoid duplicates couples the pipelines together resulting in bad design.
+Alternatively, these original columns can be resurfaced using the remainder
+passthrough mechanism without introducing coupling in the individual
+transformers that are used in `ColumnTransformer`. But 'used' columns are
+removed In `ColumnTransformer`, these columns are then removed from the
+'remainder' column list and thus cannot be surfaced . These used-up columns can
+no longer be passthrough-ed using the remainder='passthrough' mechanism.
