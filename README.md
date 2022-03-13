@@ -48,8 +48,10 @@ This package explores the following ideas:
 
 ## Example workflow
 
-### Note on why it is cumbersome to implement new features while retaining old
-  features in the current `ColumnTransformer` implementation
+### Note implementing new features being cumbersome
+
+In this note, we provide more details on why it is cumbersome to create new
+features while retaining original features with their original feature names.
 
 Prefixing can be messy and lead to duplicate columns when the original features
 need to be retained. This is because `ColumnTransformer` assumes that if a
