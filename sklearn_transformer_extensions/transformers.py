@@ -105,7 +105,7 @@ class XyAdapter(TransformerMixin, BaseEstimator):
 
         return ofmt
 
-    def splitXy(self, Xy, on_error='raise'):
+    def _splitXy(self, Xy, on_error='raise'):
         """Split Xy columns into X and y.
 
         Parameters
@@ -143,7 +143,7 @@ class XyAdapter(TransformerMixin, BaseEstimator):
 
         return X, y
 
-    def joinXy(self, X, y, ofmt):
+    def _joinXy(self, X, y, ofmt):
 
         if sparse.issparse(X):
             X = X.todense()
@@ -195,7 +195,7 @@ class XyAdapter(TransformerMixin, BaseEstimator):
     def _call(self, method, X, requires_y=True, join_y=True, reset=True,
               on_error='raise', **params):
 
-        X, y = self.splitXy(X, on_error)
+        X, y = self._splitXy(X, on_error)
         self._check_feature_names(X, reset=reset)
         self._check_n_features(X, reset=reset)
         ofmt = self._check_ofmt(X)
@@ -210,7 +210,7 @@ class XyAdapter(TransformerMixin, BaseEstimator):
 
         if join_y:
             X = method()
-            return self.joinXy(X, y, ofmt)
+            return self._joinXy(X, y, ofmt)
         else:
             return method()
 
