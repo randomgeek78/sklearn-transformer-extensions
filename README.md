@@ -9,59 +9,112 @@ ease. Besides, there are no functional limitations to using this new workflow.
 The pain points that the package addresses are:
 - `scikit-learn` API keeps the features and labels separate. This makes it
   impossible to remove outliers from the training data as part of an integrated
-  pipeline using the standard `scikit-learn` API.
-- Cumbersome to create new features while also retaining old features with
-  their original feature names, i.e. not prefixing them to avoid name clashes.
-  See note.
+  pipeline when using the standard `scikit-learn` API.
+- Cumbersome to build decentralized, multi-step pipelines. See note and example.
 
-In practice, these pain points make it very difficult to write complex
-end-to-end pipelines that do everything from filtering to feature engineering
-to model tuning using cross-validation while also being easy and intuitive to
-build.
+## Issue 1: `scikit-learn` API keeps the features and labels separate
 
-This package explores the following ideas:
-- Keep the features (X) and labels (y) together and pass them around together.
-  The combined (X, y) data structure is received by an adapter (`XyAdapter`) that
-  interfaces with an underlying transformer or estimator instance. All method
-  calls to the adapter are transparently forwarded to the underlying
-  transformer/estimator. But before forwarding the incoming data (the joint (X,
-  y) datastructure) to the underlying transformer/estimator, the data is split
-  into X and y and the split data is passed on as separate arguments. In order
-  to filter outliers or other data-points from training but not during test, we
-  can create a transformer that implements the filtering logic in its
-  `fit_transform` method. This transformer will not be couched within the
-  `XyAdapter` and will receive the joint (X, y) datastructure as a whole. Any
-  row-filtering operations it performs will be performed on both the features
-  and labels.
-- A modified `ColumnTransformer` implementation that does not relinquish
-  responsibility for all columns that are fed to one or more transformer
-  pipelines. Introduces a new `get_feature_names_used` mechanism for
-  transformers to let `ColumnTransformer` know which of the input columns it
-  wants to be responsible for. Only columns that the transformer takes
-  responsibility for are removed from the remainder list. For all other columns
-  that were provided to the transformer, responsibility continues to rest with
-  `ColumnTransformer` and these columns are not removed from the 'remainder'
-  mechanism. If a transformer does not implement the `get_feature_names_used`
-  method, then we assume that the transformer has taken responsibility for all
-  the columns that were sent to it, which defaults to the current behaviour in
-  `ColumnTransformer`.
+The first issue is highlighted in the following code snippet. We want to take
+an input, filter it for outliers, then fit a model on the filtered train set.
+The filtering step cannot be done as part of a pipeline using the current
+`scikit-learn` API.
 
-## Example workflow
+```python
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.pipeline import make_pipeline
 
-### Note implementing new features being cumbersome
+df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
+print(df_train)
+#    x    y
+# 0  0    0
+# 1  1    2
+# 2  2    4
+# 3  3    6
+# 4  4  100   # outlier
 
-In this note, we provide more details on why it is cumbersome to create new
-features while retaining original features with their original feature names.
+# Remove outlier
+lof = LocalOutlierFactor(n_neighbors=2)
+mask = lof.fit_predict(df_train)
+print(mask)
+# [ 1  1  1  1 -1]
+df_train_filtered = df_train.iloc[mask > 0, :]
 
-Prefixing can be messy and lead to duplicate columns when the original features
-need to be retained. This is because `ColumnTransformer` assumes that if a
-column is used to feed one or more transformer pipelines then these columns are
-'owned' by the pipelines and surfacing them again if needed is the pipeline's
-responsibility. But this problematic when a could is fed to multiple pipelines.
-Avoid duplicates couples the pipelines together resulting in bad design.
-Alternatively, these original columns can be resurfaced using the remainder
-passthrough mechanism without introducing coupling in the individual
-transformers that are used in `ColumnTransformer`. But 'used' columns are
-removed In `ColumnTransformer`, these columns are then removed from the
-'remainder' column list and thus cannot be surfaced . These used-up columns can
-no longer be passthrough-ed using the remainder='passthrough' mechanism.
+# Fit model to cleaned data
+lr = LinearRegression()
+lr.fit(df_train_filtered[["x"]], df_train_filtered["y"])
+
+# Predict
+df_test = pd.DataFrame({"x": np.arange(10, 17)})
+print(lr.predict(df_test[["x"]]))
+# [20. 22. 24. 26. 28. 30. 32.]
+```
+
+Using the current `scikit-learn` API, it is not possible to create a pipeline
+with both the outlier detector and the linear regressor. The solution is to
+keep the X and y together in the external API and internally deal with
+interfacing with `scikit-learn` transformers/estimators. We implemented the
+`XyAdapter` that knows how to split the joint Xy data-structure and interface
+with `scikit-learn` APIs.
+
+```python
+import pandas as pd
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin, clone
+from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.pipeline import make_pipeline
+from sklearn_transformer_extensions import XyAdapter
+
+df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
+print(df_train)
+#    x    y
+# 0  0    0
+# 1  1    2
+# 2  2    4
+# 3  3    6
+# 4  4  100   # outlier
+
+class LocalOutlierFilter(TransformerMixin, BaseEstimator):
+  def __init__(self, **kwargs):
+    self.transformer = LocalOutlierFactor(**kwargs)
+  # We want to filter the train data
+  def fit_transform(self, X, y=None, **fit_params):
+    self.transformer_ = clone(self.transformer)
+    mask = self.transformer_.fit_predict(X, y, **fit_params)
+    if hasattr(X, "iloc"):
+      X = X.iloc
+    return X[mask > 0, :]
+  # We don't filter the test data
+  def transform(self, X):
+    return X
+
+lof = LocalOutlierFilter(n_neighbors=2)
+lr = XyAdapter(LinearRegression(), "y")
+
+# Single pipeline w/ train set filtering possible
+# This pipeline can also be used to tune filter parameters like n_neighbors
+# using grid search
+p = make_pipeline(lof, lr)
+
+# Train
+p.fit(df_train)
+
+# Predict
+df_test = pd.DataFrame({"x": np.arange(10, 17)})
+print(p.predict(df_test[["x"]]))
+# [20. 22. 24. 26. 28. 30. 32.]
+
+# Check if the filter is actually filtering train set
+p[0].fit_transform(df_train)
+#    x  y
+# 0  0  0
+# 1  1  2
+# 2  2  4
+# 3  3  6
+```
+
+## Issue 2: 
+
