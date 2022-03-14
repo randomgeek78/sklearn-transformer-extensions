@@ -166,6 +166,6 @@ print(results)
 Since both the filter and the estimator are part of the same pipeline, we were
 able to jointly optimize the parameters for both. 
 
-Apart from `XyAdapter`, the drop-in replacements to ColumnTransformer and
-FunctionTransformer provide additional functionality. Please refer to their
+Apart from `XyAdapter`, the drop-in replacements to `ColumnTransformer` and
+`FunctionTransformer` provide additional functionality. Please refer to their
 documentation for more details.
