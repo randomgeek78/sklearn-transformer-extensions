@@ -1,23 +1,23 @@
 # sklearn-transformer-extensions
 
-This python package attempts to make building end-to-end pipelines using
-`scikit-learn` easier and more intuitive. It provides a collection of new
-classes and drop-in replacements to some existing `scikit-learn` classes that
-work together to make it very easy to build very sophisticated pipelines with
-ease. Besides, there are no functional limitations to using this new workflow.
+This python package attempts to make building pipelines using `scikit-learn`
+easier and more intuitive. For some use-cases, keeping the features (X) and the
+labels (y) together in the same data-structure provides more flexibility when
+building end-to-end pipelines. This package provides the `XyAdapter` class that
+can interface with any `scikit-learn` transformer or estimator that requires
+the features and labels to be provided as separate arguments while surfacing
+the transformed features and labels together externally. In addition, this
+package provides drop-in replacements to `ColumnTransformer` and
+`FunctionTransformer` that extend their functionality and make them more easier
+to use with pandas data-structures. 
 
-The pain points that the package addresses are:
-- `scikit-learn` API keeps the features and labels separate. This makes it
-  impossible to remove outliers from the training data as part of an integrated
-  pipeline when using the standard `scikit-learn` API.
-- Cumbersome to build decentralized, multi-step pipelines. See note and example.
-
-## Issue 1: `scikit-learn` API keeps the features and labels separate
-
-The first issue is highlighted in the following code snippet. We want to take
-an input, filter it for outliers, then fit a model on the filtered train set.
-The filtering step cannot be done as part of a pipeline using the current
-`scikit-learn` API.
+To motivate one use-case for using `XyAdapter`, we would like to filter
+outliers from input before fitting a model to it. The filtering step cannot be
+done as part of a pipeline using the current `scikit-learn` API. Our goal is to
+overcome this limitation by using the `XyAdapter` to build a single pipeline
+that does both filtering and modeling. The unified pipeline would enable
+end-to-end grid search and cross-validation including tuning of parameters of
+the filtering algorithm.
 
 ```python
 import pandas as pd
@@ -52,12 +52,25 @@ print(lr.predict(df_test[["x"]]))
 # [20. 22. 24. 26. 28. 30. 32.]
 ```
 
-Using the current `scikit-learn` API, it is not possible to create a pipeline
-with both the outlier detector and the linear regressor. The solution is to
-keep the X and y together in the external API and internally deal with
-interfacing with `scikit-learn` transformers/estimators. We implemented the
-`XyAdapter` that knows how to split the joint Xy data-structure and interface
-with `scikit-learn` APIs.
+The filtering step cannot be combined with the modeling step as part of a
+unified pipeline. This is because, at any step of the pipeline, a transformer
+only gets to influence the features and not the labels that are seen by the
+steps that follow. Thus, transformer steps that affect the number of rows will
+make the features and labels mismatched.
+
+The solution is to keep the X and y together in the external API of any
+individual pipeline step so both the features and labels are passed around
+together as they move through the pipeline and are thus always in sync. We
+implemented the `XyAdapter` that receives the combined X and y object and knows
+how to split them into the features and labels and transparently interface with
+a `scikit-learn` transformer or estimator method that require them to be
+separate function arguments. Upon receiving the transformed features from the
+underlying transformer, the `XyAdapter` class then packages the transformed
+features and original labels and returns the combined data-structure. This way,
+external to the `XyAdapter` class, a combined data-structure that contains both
+the transformed features and labels is passed around as the "features" while
+the labels as far as the pipeline is concerned is always None. As far as the
+pipeline is concerned, it is dealing with an unsupervised learning scenario.
 
 ```python
 import pandas as pd
@@ -67,6 +80,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.pipeline import make_pipeline
 from sklearn_transformer_extensions import XyAdapter
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import KFold
 
 df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
 print(df_train)
@@ -80,6 +95,11 @@ print(df_train)
 class LocalOutlierFilter(TransformerMixin, BaseEstimator):
   def __init__(self, **kwargs):
     self.transformer = LocalOutlierFactor(**kwargs)
+  def get_params(self, deep=True):
+    return self.transformer.get_params(deep=deep)
+  def set_params(self, **kwargs):
+    self.transformer.set_params(**kwargs)
+    return self
   # We want to filter the train data
   def fit_transform(self, X, y=None, **fit_params):
     self.transformer_ = clone(self.transformer)
@@ -114,7 +134,38 @@ p[0].fit_transform(df_train)
 # 1  1  2
 # 2  2  4
 # 3  3  6
+
+# Perform joint grid search of both the filtering step and the modeling step.
+
+kfolds = KFold(n_splits=2, shuffle=True, random_state=42)
+gs = GridSearchCV(
+    p, param_grid={
+        "localoutlierfilter__n_neighbors": (1, 2),
+        "xyadapter__transformer__fit_intercept": (True, False),
+    }, refit=False, cv=kfolds, return_train_score=True, error_score='raise')
+
+gs.fit(df_train)
+
+results = pd.DataFrame({
+  "n_neighbors": gs.cv_results_['param_localoutlierfilter__n_neighbors'],
+  "fit_intercept": gs.cv_results_['param_xyadapter__transformer__fit_intercept'],
+  "mean_train": gs.cv_results_['mean_train_score'],
+  "std_train": gs.cv_results_['std_train_score'],
+  "mean_test": gs.cv_results_['mean_test_score'],
+  "std_test": gs.cv_results_['std_test_score'],
+})
+print(results)
+#   n_neighbors fit_intercept  mean_train  std_train   mean_test    std_test
+# 0           1          True    0.325542   0.674458    0.325542    0.674458
+# 1           1         False    0.325542   0.674458    0.325542    0.674458
+# 2           2          True    0.951824   0.048176 -135.223211  134.874295
+# 3           2         False    0.839415   0.160585  -76.445433   76.096517
+
 ```
 
-## Issue 2: 
+Since both the filter and the estimator are part of the same pipeline, we were
+able to jointly optimize the parameters for both. 
 
+Apart from `XyAdapter`, the drop-in replacements to ColumnTransformer and
+FunctionTransformer provide additional functionality. Please refer to their
+documentation for more details.
