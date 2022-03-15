@@ -9,16 +9,15 @@ homepage = "https://github.com/randomgeek78/sklearn-transformer-extensions"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-scikit-learn = "^1.0.2"
-pandas = "^1.4.1"
-numpy = "^1.22.3"
+scikit-learn = "^1.0.0"
+numpy = "*"
+pandas = {version = "*", optional = true}
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
-ipython = "^8.1.1"
-ipdb = "^0.13.9"
-numpy = "^1.22.3"
-jupyter = "^1.0.0"
+pytest = "*"
+ipython = "*"
+ipdb = "*"
+jupyter = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
