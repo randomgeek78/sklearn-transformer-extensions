@@ -139,10 +139,6 @@ def XyAdapterFactory(klass):
                 return object.__getattribute__(
                     object.__getattribute__(self, "transformer"), name)
 
-        # def __getattribute__(self, name):
-        #     return object.__getattribute__(
-        #         object.__getattribute__(self, "transformer"), name)
-
         def __hash__(self):
             return hash((self.transformer, self.target_col, self.ofmt))
 
