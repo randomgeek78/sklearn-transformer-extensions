@@ -39,6 +39,7 @@ class Pipeline(_Pipeline):
             steps[i] = (name, XyAdapter(trans, self.target_col, ofmt=self.ofmt))
 
         self.steps__ = steps
+        return self
 
     def get_params(self, deep=True):
         params = super().get_params(deep=deep)

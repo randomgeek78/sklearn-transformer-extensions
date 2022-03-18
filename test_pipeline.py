@@ -42,7 +42,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 
-from sklearn_transformer_extensions import XyAdapter
+from sklearn_transformer_extensions import XyAdapter, XyData
 from functools import partial
 
 iris = load_iris()
@@ -274,30 +274,25 @@ def test_pipeline_init_tuple(Pipeline):
             pipe = Pipeline((("transf", Transf()), ("clf", FitParamT())))
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_methods_anova(Pipeline):
+@pytest.mark.parametrize("Pipeline,Xyfn", [
+    (_Pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=None), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_methods_anova(Pipeline, Xyfn):
     # Test the various methods of the pipeline (anova).
     X = iris.data
     y = iris.target
-    Xy = np.hstack((X, np.atleast_2d(y).T))
+    X = Xyfn(X, y)
     # Test with Anova + LogisticRegression
     clf = LogisticRegression()
     filter1 = SelectKBest(f_classif, k=2)
-    if Pipeline is _Pipeline:
-        pipe = Pipeline([("anova", filter1), ("logistic", clf)])
-        pipe.fit(X, y)
-    else:
-        pipe = Pipeline([("anova", filter1), ("logistic", clf)], -1)
-        pipe.fit(Xy)
-
+    pipe = Pipeline([("anova", filter1), ("logistic", clf)])
+    pipe.fit(X, y)
     pipe.predict(X)
     pipe.predict_proba(X)
     pipe.predict_log_proba(X)
 
-    if Pipeline is _Pipeline:
-        pipe.score(X, y)
-    else:
-        pipe.score(Xy)
+    pipe.score(X, y)
 
 
 @pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
@@ -317,10 +312,14 @@ def test_pipeline_fit_params(Pipeline):
         pipe.fit(None, None, clf__bad=True)
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_sample_weight_supported(Pipeline):
+@pytest.mark.parametrize("Pipeline,Xyfn", [
+    (_Pipeline, lambda X: X),
+    (partial(Pipeline, target_col=None), lambda X: X),
+])
+def test_pipeline_sample_weight_supported(Pipeline, Xyfn):
     # Pipeline should pass sample_weight
     X = np.array([[1, 2]])
+    X = Xyfn(X)
     pipe = Pipeline([("transf", Transf()), ("clf", FitParamT())])
     pipe.fit(X, y=None)
     assert pipe.score(X) == 3
@@ -329,10 +328,14 @@ def test_pipeline_sample_weight_supported(Pipeline):
     assert pipe.score(X, sample_weight=np.array([2, 3])) == 8
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_sample_weight_unsupported(Pipeline):
+@pytest.mark.parametrize("Pipeline,Xyfn", [
+    (_Pipeline, lambda X: X),
+    (partial(Pipeline, target_col=None), lambda X: X),
+])
+def test_pipeline_sample_weight_unsupported(Pipeline, Xyfn):
     # When sample_weight is None it shouldn't be passed
     X = np.array([[1, 2]])
+    X = Xyfn(X)
     pipe = Pipeline([("transf", Transf()), ("clf", Mult())])
     pipe.fit(X, y=None)
     assert pipe.score(X) == 3
@@ -362,19 +365,19 @@ def test_pipeline_raise_set_params_error(Pipeline):
         pipe.set_params(fake__estimator="nope")
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_methods_pca_svm(Pipeline):
+@pytest.mark.parametrize(
+    "Pipeline,Xyfn",
+    [(_Pipeline, lambda X, y: X),
+     (partial(Pipeline, target_col=None), lambda X, y: XyData(X, y))])
+def test_pipeline_methods_pca_svm(Pipeline, Xyfn):
     # Test the various methods of the pipeline (pca + svm).
     X = iris.data
     y = iris.target
+    X = Xyfn(X, y)
     # Test with PCA + SVC
     clf = SVC(probability=True, random_state=0)
     pca = PCA(svd_solver="full", n_components="mle", whiten=True)
-    if Pipeline is _Pipeline:
-        pipe = Pipeline([("pca", pca), ("svc", clf)])
-    else:
-        X = np.hstack((X, np.atleast_2d(y).T))
-        pipe = Pipeline([("pca", pca), ("svc", clf)], -1)
+    pipe = Pipeline([("pca", pca), ("svc", clf)])
     pipe.fit(X, y)
     pipe.predict(X)
     pipe.predict_proba(X)
@@ -382,9 +385,13 @@ def test_pipeline_methods_pca_svm(Pipeline):
     pipe.score(X, y)
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_score_samples_pca_lof(Pipeline):
+@pytest.mark.parametrize("Pipeline,Xyfn", [
+    (_Pipeline, lambda X: X),
+    (partial(Pipeline, target_col=None), lambda X: X),
+])
+def test_pipeline_score_samples_pca_lof(Pipeline, Xyfn):
     X = iris.data
+    X = Xyfn(X)
     # Test that the score_samples method is implemented on a pipeline.
     # Test that the score_samples method on pipeline yields same results as
     # applying transform and score_samples steps separately.
@@ -399,17 +406,17 @@ def test_pipeline_score_samples_pca_lof(Pipeline):
     assert_allclose(pipe.score_samples(X), lof.score_samples(pca.transform(X)))
 
 
-@pytest.mark.parametrize("make_pipeline", [_make_pipeline, make_pipeline])
-def test_score_samples_on_pipeline_without_score_samples(make_pipeline):
+@pytest.mark.parametrize("make_pipeline,Xyfn", [
+    (_make_pipeline, lambda X, y: X),
+    (partial(make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_score_samples_on_pipeline_without_score_samples(make_pipeline, Xyfn):
     X = np.array([[1], [2]])
     y = np.array([1, 2])
+    X = Xyfn(X, y)
     # Test that a pipeline does not have score_samples method when the final
     # step of the pipeline does not have score_samples defined.
-    if make_pipeline is _make_pipeline:
-        pipe = make_pipeline(LogisticRegression())
-    else:
-        X = np.hstack((X, np.atleast_2d(y).T))
-        pipe = make_pipeline(LogisticRegression(), target_col=-1)
+    pipe = make_pipeline(LogisticRegression())
     pipe.fit(X, y)
     with pytest.raises(
             AttributeError,
@@ -418,8 +425,12 @@ def test_score_samples_on_pipeline_without_score_samples(make_pipeline):
         pipe.score_samples(X)
 
 
-@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
-def test_pipeline_methods_preprocessing_svm(Pipeline):
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_methods_preprocessing_svm(Pipeline, make_pipeline, Xyfn):
     # Test the various methods of the pipeline (preprocessing + svm).
     X = iris.data
     y = iris.target
@@ -429,12 +440,10 @@ def test_pipeline_methods_preprocessing_svm(Pipeline):
     pca = PCA(n_components=2, svd_solver="randomized", whiten=True)
     clf = SVC(probability=True, random_state=0, decision_function_shape="ovr")
 
+    X = Xyfn(X, y)
+
     for preprocessing in [scaler, pca]:
-        if Pipeline is _Pipeline:
-            pipe = Pipeline([("preprocess", preprocessing), ("svc", clf)])
-        else:
-            X = np.hstack((X, np.atleast_2d(y).T))
-            pipe = Pipeline([("preprocess", preprocessing), ("svc", clf)], -1)
+        pipe = Pipeline([("preprocess", preprocessing), ("svc", clf)])
         pipe.fit(X, y)
 
         # check shapes of various prediction functions
@@ -453,11 +462,12 @@ def test_pipeline_methods_preprocessing_svm(Pipeline):
         pipe.score(X, y)
 
 
-@pytest.mark.parametrize("Pipeline", [
-    _Pipeline,
-    partial(Pipeline, target_col=None),
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
-def test_fit_predict_on_pipeline(Pipeline):
+def test_fit_predict_on_pipeline(Pipeline, make_pipeline, Xyfn):
     # test that the fit_predict method is implemented on a pipeline
     # test that the fit_predict on pipeline yields same results as applying
     # transform and clustering steps separately
@@ -710,13 +720,14 @@ def test_pipeline_correctly_adjusts_steps(Pipeline, Xyfn, passthrough):
     assert expected_names == actual_names
 
 
-@pytest.mark.parametrize("Pipeline,Xyfn", [
-    (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
 @pytest.mark.parametrize("passthrough", [None, "passthrough"])
-def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
+def test_set_pipeline_step_passthrough(Pipeline, make_pipeline, Xyfn,
+                                       passthrough):
     X = np.array([[1]])
     y = np.array([1])
     X = Xyfn(X, y)
@@ -732,26 +743,23 @@ def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
     exp = 2 * 3 * 5
     if Pipeline is _Pipeline:
         assert_array_equal([[exp]], pipeline.fit_transform(X, y))
-    else:
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
-
-    assert_array_equal([exp], pipeline.fit(X).predict(X))
-    if Pipeline is _Pipeline:
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
 
     pipeline.set_params(m3=passthrough)
     exp = 2 * 5
     if Pipeline is _Pipeline:
         assert_array_equal([[exp]], pipeline.fit_transform(X, y))
-    else:
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
-    assert_array_equal([exp], pipeline.fit(X).predict(X))
-    if Pipeline is _Pipeline:
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
     expected = {
         "steps": pipeline.steps,
         "m2": mult2,
@@ -766,18 +774,16 @@ def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
         expected.update(dict(ofmt=None, target_col=-1))
     assert pipeline.get_params(deep=True) == expected
 
-
     pipeline.set_params(m2=passthrough)
     exp = 5
     if Pipeline is _Pipeline:
         assert_array_equal([[exp]], pipeline.fit_transform(X, y))
-    else:
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
-    assert_array_equal([exp], pipeline.fit(X).predict(X))
-    if Pipeline is _Pipeline:
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
+        assert_array_equal([exp], pipeline.fit(X).predict(X))
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
 
     # for other methods, ensure no AttributeErrors on None:
     other_methods = [
@@ -797,10 +803,9 @@ def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
         assert_array_equal([exp], pipeline.fit(X).predict(X))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
         assert_array_equal([exp], pipeline.fit(X).predict(X))
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
-
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
 
     pipeline = make()
     pipeline.set_params(last=passthrough)
@@ -811,9 +816,9 @@ def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
         assert_array_equal([[exp]], pipeline.fit_transform(X, y))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal([[exp]], pipeline.fit(X, y).transform(X)[:, :-1])
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
+        assert_array_equal([[exp]], pipeline.fit(X, y).transform(X).X)
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
 
     msg = "'str' object has no attribute 'predict'"
     with pytest.raises(AttributeError, match=msg):
@@ -827,10 +832,9 @@ def test_set_pipeline_step_passthrough(Pipeline, Xyfn, passthrough):
         assert_array_equal([exp], pipeline.fit(X).predict(X))
         assert_array_equal(X, pipeline.inverse_transform([[exp]]))
     else:
-        assert_array_equal([[exp]], pipeline.fit_transform(X, y)[:, :-1])
+        assert_array_equal([[exp]], pipeline.fit_transform(X, y).X)
         assert_array_equal([exp], pipeline.fit(X).predict(X))
-        assert_array_equal(X[:, :-1], pipeline.inverse_transform([[exp]]))
-
+        assert_array_equal(X.X, pipeline.inverse_transform([[exp]]))
 
 
 @pytest.mark.parametrize("make_pipeline", [_make_pipeline, make_pipeline])
@@ -861,6 +865,7 @@ def test_pipeline_ducktyping(make_pipeline):
     pipeline.transform
     assert not hasattr(pipeline, "inverse_transform")
 
+
 @pytest.mark.parametrize("make_pipeline", [_make_pipeline, make_pipeline])
 def test_make_pipeline(make_pipeline):
     t1 = Transf()
@@ -877,12 +882,12 @@ def test_make_pipeline(make_pipeline):
     assert pipe.steps[2][0] == "fitparamt"
 
 
-@pytest.mark.parametrize("make_pipeline,Xyfn", [
-    (_make_pipeline, lambda X, y: X),
-    (partial(make_pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
-def test_classes_property(make_pipeline, Xyfn):
+def test_classes_property(Pipeline, make_pipeline, Xyfn):
     X = iris.data
     y = iris.target
     X = Xyfn(X, y)
@@ -905,6 +910,7 @@ def test_set_params_nested_pipeline(Pipeline):
     estimator.set_params(a__b__alpha=0.001, a__b=Lasso())
     estimator.set_params(a__steps=[("b", LogisticRegression())], a__b__C=5)
 
+
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
     (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
@@ -918,42 +924,47 @@ def test_pipeline_wrong_memory(Pipeline, Xyfn):
     X = Xyfn(X, y)
     # Define memory as an integer
     memory = 1
-    cached_pipe = Pipeline([("transf", DummyTransf()), ("svc", SVC())], memory=memory)
+    cached_pipe = Pipeline([("transf", DummyTransf()), ("svc", SVC())],
+                           memory=memory)
 
     msg = re.escape(
         "'memory' should be None, a string or have the same interface "
-        "as joblib.Memory. Got memory='1' instead."
-    )
+        "as joblib.Memory. Got memory='1' instead.")
     with pytest.raises(ValueError, match=msg):
         cached_pipe.fit(X, y)
 
+
 class DummyMemory:
+
     def cache(self, func):
         return func
+
 
 class WrongDummyMemory:
     pass
 
+
 @pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
 def test_pipeline_with_cache_attribute(Pipeline):
     X = np.array([[1, 2]])
-    pipe = Pipeline([("transf", Transf()), ("clf", Mult())], memory=DummyMemory())
+    pipe = Pipeline([("transf", Transf()), ("clf", Mult())],
+                    memory=DummyMemory())
     pipe.fit(X, y=None)
     dummy = WrongDummyMemory()
     pipe = Pipeline([("transf", Transf()), ("clf", Mult())], memory=dummy)
     msg = re.escape(
         "'memory' should be None, a string or have the same interface "
-        f"as joblib.Memory. Got memory='{dummy}' instead."
-    )
+        f"as joblib.Memory. Got memory='{dummy}' instead.")
     with pytest.raises(ValueError, match=msg):
         pipe.fit(X)
 
-@pytest.mark.parametrize("Pipeline,Xyfn", [
-    (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
-def test_pipeline_memory(Pipeline, Xyfn):
+def test_pipeline_memory(Pipeline, make_pipeline, Xyfn):
     X = iris.data
     y = iris.target
     X = Xyfn(X, y)
@@ -968,7 +979,8 @@ def test_pipeline_memory(Pipeline, Xyfn):
         clf = SVC(probability=True, random_state=0)
         transf = DummyTransf()
         pipe = Pipeline([("transf", clone(transf)), ("svc", clf)])
-        cached_pipe = Pipeline([("transf", transf), ("svc", clf)], memory=memory)
+        cached_pipe = Pipeline([("transf", transf), ("svc", clf)],
+                               memory=memory)
 
         # Memoize the transformer at the first fit
         cached_pipe.fit(X, y)
@@ -978,11 +990,11 @@ def test_pipeline_memory(Pipeline, Xyfn):
         # Check that cached_pipe and pipe yield identical results
         assert_array_equal(pipe.predict(X), cached_pipe.predict(X))
         assert_array_equal(pipe.predict_proba(X), cached_pipe.predict_proba(X))
-        assert_array_equal(pipe.predict_log_proba(X), cached_pipe.predict_log_proba(X))
+        assert_array_equal(pipe.predict_log_proba(X),
+                           cached_pipe.predict_log_proba(X))
         assert_array_equal(pipe.score(X, y), cached_pipe.score(X, y))
-        assert_array_equal(
-            pipe.named_steps["transf"].means_, cached_pipe.named_steps["transf"].means_
-        )
+        assert_array_equal(pipe.named_steps["transf"].means_,
+                           cached_pipe.named_steps["transf"].means_)
         assert not hasattr(transf, "means_")
         # Check that we are reading the cache while fitting
         # a second time
@@ -990,27 +1002,26 @@ def test_pipeline_memory(Pipeline, Xyfn):
         # Check that cached_pipe and pipe yield identical results
         assert_array_equal(pipe.predict(X), cached_pipe.predict(X))
         assert_array_equal(pipe.predict_proba(X), cached_pipe.predict_proba(X))
-        assert_array_equal(pipe.predict_log_proba(X), cached_pipe.predict_log_proba(X))
+        assert_array_equal(pipe.predict_log_proba(X),
+                           cached_pipe.predict_log_proba(X))
         assert_array_equal(pipe.score(X, y), cached_pipe.score(X, y))
-        assert_array_equal(
-            pipe.named_steps["transf"].means_, cached_pipe.named_steps["transf"].means_
-        )
+        assert_array_equal(pipe.named_steps["transf"].means_,
+                           cached_pipe.named_steps["transf"].means_)
         assert ts == cached_pipe.named_steps["transf"].timestamp_
         # Create a new pipeline with cloned estimators
         # Check that even changing the name step does not affect the cache hit
         clf_2 = SVC(probability=True, random_state=0)
         transf_2 = DummyTransf()
-        cached_pipe_2 = Pipeline(
-            [("transf_2", transf_2), ("svc", clf_2)], memory=memory
-        )
+        cached_pipe_2 = Pipeline([("transf_2", transf_2), ("svc", clf_2)],
+                                 memory=memory)
         cached_pipe_2.fit(X, y)
 
         # Check that cached_pipe and pipe yield identical results
         assert_array_equal(pipe.predict(X), cached_pipe_2.predict(X))
-        assert_array_equal(pipe.predict_proba(X), cached_pipe_2.predict_proba(X))
-        assert_array_equal(
-            pipe.predict_log_proba(X), cached_pipe_2.predict_log_proba(X)
-        )
+        assert_array_equal(pipe.predict_proba(X),
+                           cached_pipe_2.predict_proba(X))
+        assert_array_equal(pipe.predict_log_proba(X),
+                           cached_pipe_2.predict_log_proba(X))
         assert_array_equal(pipe.score(X, y), cached_pipe_2.score(X, y))
         assert_array_equal(
             pipe.named_steps["transf"].means_,
@@ -1019,6 +1030,7 @@ def test_pipeline_memory(Pipeline, Xyfn):
         assert ts == cached_pipe_2.named_steps["transf_2"].timestamp_
     finally:
         shutil.rmtree(cachedir)
+
 
 @pytest.mark.parametrize("make_pipeline,Xyfn", [
     (_make_pipeline, lambda X, y: X),
@@ -1040,7 +1052,9 @@ def test_make_pipeline_memory(make_pipeline, Xyfn):
 
     shutil.rmtree(cachedir)
 
+
 class FeatureNameSaver(BaseEstimator):
+
     def fit(self, X, y=None):
         self._check_feature_names(X, reset=True)
         return self
@@ -1051,20 +1065,19 @@ class FeatureNameSaver(BaseEstimator):
     def get_feature_names_out(self, input_features=None):
         return input_features
 
-@pytest.mark.parametrize("Pipeline,Xyfn", [
-    (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
-def test_features_names_passthrough(Pipeline, Xyfn):
+def test_features_names_passthrough(Pipeline, make_pipeline, Xyfn):
     """Check pipeline.get_feature_names_out with passthrough"""
-    pipe = Pipeline(
-        steps=[
-            ("names", FeatureNameSaver()),
-            ("pass", "passthrough"),
-            ("clf", LogisticRegression()),
-        ]
-    )
+    pipe = Pipeline(steps=[
+        ("names", FeatureNameSaver()),
+        ("pass", "passthrough"),
+        ("clf", LogisticRegression()),
+    ])
     iris = load_iris()
 
     X = iris.data
@@ -1072,18 +1085,19 @@ def test_features_names_passthrough(Pipeline, Xyfn):
     X = Xyfn(X, y)
 
     pipe.fit(X, y)
-    assert_array_equal(
-        pipe[:-1].get_feature_names_out(iris.feature_names), iris.feature_names
-    )
+    assert_array_equal(pipe[:-1].get_feature_names_out(iris.feature_names),
+                       iris.feature_names)
 
-@pytest.mark.parametrize("Pipeline,Xyfn", [
-    (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (np.atleast_2d(X).T, np.atleast_2d(y).T))),
+
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
 ])
-def test_feature_names_count_vectorizer(Pipeline, Xyfn):
+def test_feature_names_count_vectorizer(Pipeline, make_pipeline, Xyfn):
     """Check pipeline.get_feature_names_out with vectorizers"""
-    pipe = Pipeline(steps=[("vect", CountVectorizer()), ("clf", LogisticRegression())])
+    pipe = Pipeline(steps=[("vect",
+                            CountVectorizer()), ("clf", LogisticRegression())])
     X = JUNK_FOOD_DOCS
     y = ["pizza" in x for x in JUNK_FOOD_DOCS]
     X = Xyfn(X, y)
@@ -1097,260 +1111,218 @@ def test_feature_names_count_vectorizer(Pipeline, Xyfn):
         ["beer", "burger", "coke", "copyright", "pizza", "the"],
     )
 
-# def test_pipeline_feature_names_out_error_without_definition():
-#     """Check that error is raised when a transformer does not define
-#     `get_feature_names_out`."""
-#     pipe = Pipeline(steps=[("notrans", NoTrans())])
-#     iris = load_iris()
-#     pipe.fit(iris.data, iris.target)
 
-#     msg = "does not provide get_feature_names_out"
-#     with pytest.raises(AttributeError, match=msg):
-#         pipe.get_feature_names_out()
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_feature_names_out_error_without_definition(
+        Pipeline, make_pipeline, Xyfn):
+    """Check that error is raised when a transformer does not define
+    `get_feature_names_out`."""
+    pipe = Pipeline(steps=[("notrans", NoTrans())])
+    iris = load_iris()
+    X = iris.data
+    y = iris.target
+    X = Xyfn(X, y)
+    pipe.fit(X, y)
 
-# def test_pipeline_param_error():
-#     clf = make_pipeline(LogisticRegression())
-#     with pytest.raises(
-#         ValueError, match="Pipeline.fit does not accept the sample_weight parameter"
-#     ):
-#         clf.fit([[0], [0]], [0, 1], sample_weight=[1, 1])
+    msg = "does not provide get_feature_names_out"
+    with pytest.raises(AttributeError, match=msg):
+        pipe.get_feature_names_out()
 
-# parameter_grid_test_verbose = (
-#     (est, pattern, method)
-#     for (est, pattern), method in itertools.product(
-#         [
-#             (
-#                 Pipeline([("transf", Transf()), ("clf", FitParamT())]),
-#                 r"\[Pipeline\].*\(step 1 of 2\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 2\) Processing clf.* total=.*\n$",
-#             ),
-#             (
-#                 Pipeline([("transf", Transf()), ("noop", None), ("clf", FitParamT())]),
-#                 r"\[Pipeline\].*\(step 1 of 3\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 3\) Processing noop.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 3 of 3\) Processing clf.* total=.*\n$",
-#             ),
-#             (
-#                 Pipeline(
-#                     [
-#                         ("transf", Transf()),
-#                         ("noop", "passthrough"),
-#                         ("clf", FitParamT()),
-#                     ]
-#                 ),
-#                 r"\[Pipeline\].*\(step 1 of 3\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 3\) Processing noop.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 3 of 3\) Processing clf.* total=.*\n$",
-#             ),
-#             (
-#                 Pipeline([("transf", Transf()), ("clf", None)]),
-#                 r"\[Pipeline\].*\(step 1 of 2\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 2\) Processing clf.* total=.*\n$",
-#             ),
-#             (
-#                 Pipeline([("transf", None), ("mult", Mult())]),
-#                 r"\[Pipeline\].*\(step 1 of 2\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 2\) Processing mult.* total=.*\n$",
-#             ),
-#             (
-#                 Pipeline([("transf", "passthrough"), ("mult", Mult())]),
-#                 r"\[Pipeline\].*\(step 1 of 2\) Processing transf.* total=.*\n"
-#                 r"\[Pipeline\].*\(step 2 of 2\) Processing mult.* total=.*\n$",
-#             ),
-#             (
-#                 FeatureUnion([("mult1", Mult()), ("mult2", Mult())]),
-#                 r"\[FeatureUnion\].*\(step 1 of 2\) Processing mult1.* total=.*\n"
-#                 r"\[FeatureUnion\].*\(step 2 of 2\) Processing mult2.* total=.*\n$",
-#             ),
-#             (
-#                 FeatureUnion([("mult1", "drop"), ("mult2", Mult()), ("mult3", "drop")]),
-#                 r"\[FeatureUnion\].*\(step 1 of 1\) Processing mult2.* total=.*\n$",
-#             ),
-#         ],
-#         ["fit", "fit_transform", "fit_predict"],
-#     )
-#     if hasattr(est, method)
-#     and not (
-#         method == "fit_transform"
-#         and hasattr(est, "steps")
-#         and isinstance(est.steps[-1][1], FitParamT)
-#     )
-# )
 
-# @pytest.mark.parametrize("est, pattern, method", parameter_grid_test_verbose)
-# def test_verbose(est, method, pattern, capsys):
-#     func = getattr(est, method)
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_param_error(Pipeline, make_pipeline, Xyfn):
+    clf = make_pipeline(LogisticRegression())
+    with pytest.raises(
+            ValueError,
+            match="Pipeline.fit does not accept the sample_weight parameter"):
+        X = [[0], [0]]
+        y = [0, 1]
+        X = Xyfn(X, y)
+        clf.fit(X, y, sample_weight=[1, 1])
 
-#     X = [[1, 2, 3], [4, 5, 6]]
-#     y = [[7], [8]]
 
-#     est.set_params(verbose=False)
-#     func(X, y)
-#     assert not capsys.readouterr().out, "Got output for verbose=False"
+parameter_grid_test_verbose = ((est, pattern, method) for (
+    est, pattern), method in itertools.product(
+        [
+            (
+                Pipeline([("transf", Transf()), ("clf", FitParamT())]),
+                r"\[Pipeline\].*\(step 1 of 2\) Processing transf.* total=.*\n"
+                r"\[Pipeline\].*\(step 2 of 2\) Processing clf.* total=.*\n$",
+            ),
+        ],
+        ["fit", "fit_transform", "fit_predict"],
+    ) if hasattr(est, method) and not (method == "fit_transform" and hasattr(
+        est, "steps") and isinstance(est.steps[-1][1], FitParamT)))
 
-#     est.set_params(verbose=True)
-#     func(X, y)
-#     assert re.match(pattern, capsys.readouterr().out)
 
-# def test_n_features_in_pipeline():
-#     # make sure pipelines delegate n_features_in to the first step
+@pytest.mark.parametrize("est, pattern, method", parameter_grid_test_verbose)
+def test_verbose(est, method, pattern, capsys):
+    func = getattr(est, method)
 
-#     X = [[1, 2], [3, 4], [5, 6]]
-#     y = [0, 1, 2]
+    X = [[1, 2, 3], [4, 5, 6]]
+    y = [[7], [8]]
 
-#     ss = StandardScaler()
-#     gbdt = HistGradientBoostingClassifier()
-#     pipe = make_pipeline(ss, gbdt)
-#     assert not hasattr(pipe, "n_features_in_")
-#     pipe.fit(X, y)
-#     assert pipe.n_features_in_ == ss.n_features_in_ == 2
+    if est.__class__ is not _Pipeline:
+        X = XyData(X, y)
 
-#     # if the first step has the n_features_in attribute then the pipeline also
-#     # has it, even though it isn't fitted.
-#     ss = StandardScaler()
-#     gbdt = HistGradientBoostingClassifier()
-#     pipe = make_pipeline(ss, gbdt)
-#     ss.fit(X, y)
-#     assert pipe.n_features_in_ == ss.n_features_in_ == 2
-#     assert not hasattr(gbdt, "n_features_in_")
+    est.set_params(verbose=False)
+    func(X, y)
+    assert not capsys.readouterr().out, "Got output for verbose=False"
 
-# def test_n_features_in_feature_union():
-#     # make sure FeatureUnion delegates n_features_in to the first transformer
+    est.set_params(verbose=True)
+    func(X, y)
+    assert re.match(pattern, capsys.readouterr().out)
 
-#     X = [[1, 2], [3, 4], [5, 6]]
-#     y = [0, 1, 2]
 
-#     ss = StandardScaler()
-#     fu = make_union(ss)
-#     assert not hasattr(fu, "n_features_in_")
-#     fu.fit(X, y)
-#     assert fu.n_features_in_ == ss.n_features_in_ == 2
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_n_features_in_pipeline(Pipeline, make_pipeline, Xyfn):
+    # make sure pipelines delegate n_features_in to the first step
 
-#     # if the first step has the n_features_in attribute then the feature_union
-#     # also has it, even though it isn't fitted.
-#     ss = StandardScaler()
-#     fu = make_union(ss)
-#     ss.fit(X, y)
-#     assert fu.n_features_in_ == ss.n_features_in_ == 2
+    X = [[1, 2], [3, 4], [5, 6]]
+    y = [0, 1, 2]
+    X = Xyfn(X, y)
 
-# def test_feature_union_fit_params():
-#     # Regression test for issue: #15117
-#     class Dummy(TransformerMixin, BaseEstimator):
-#         def fit(self, X, y=None, **fit_params):
-#             if fit_params != {"a": 0}:
-#                 raise ValueError
-#             return self
+    ss = StandardScaler()
+    gbdt = HistGradientBoostingClassifier()
+    pipe = make_pipeline(ss, gbdt)
+    assert not hasattr(pipe, "n_features_in_")
+    pipe.fit(X, y)
+    assert pipe.n_features_in_ == ss.n_features_in_ == 2
 
-#         def transform(self, X, y=None):
-#             return X
+    # if the first step has the n_features_in attribute then the pipeline also
+    # has it, even though it isn't fitted.
+    ss = StandardScaler()
+    gbdt = HistGradientBoostingClassifier()
+    pipe = make_pipeline(ss, gbdt)
+    if Pipeline is _Pipeline:
+        ss.fit(X, y)
+    else:
+        ss.fit(X.X, y)
+    assert pipe.n_features_in_ == ss.n_features_in_ == 2
+    assert not hasattr(gbdt, "n_features_in_")
 
-#     X, y = iris.data, iris.target
-#     t = FeatureUnion([("dummy0", Dummy()), ("dummy1", Dummy())])
-#     with pytest.raises(ValueError):
-#         t.fit(X, y)
 
-#     with pytest.raises(ValueError):
-#         t.fit_transform(X, y)
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_missing_values_leniency(Pipeline, make_pipeline, Xyfn):
+    # check that pipeline let the missing values validation to
+    # the underlying transformers and predictors.
+    X, y = iris.data, iris.target
+    mask = np.random.choice([1, 0], X.shape, p=[0.1, 0.9]).astype(bool)
+    X[mask] = np.nan
+    X = Xyfn(X, y)
+    pipe = make_pipeline(SimpleImputer(), LogisticRegression())
+    assert pipe.fit(X, y).score(X, y) > 0.4
 
-#     t.fit(X, y, a=0)
-#     t.fit_transform(X, y, a=0)
 
-# def test_pipeline_missing_values_leniency():
-#     # check that pipeline let the missing values validation to
-#     # the underlying transformers and predictors.
-#     X, y = iris.data, iris.target
-#     mask = np.random.choice([1, 0], X.shape, p=[0.1, 0.9]).astype(bool)
-#     X[mask] = np.nan
-#     pipe = make_pipeline(SimpleImputer(), LogisticRegression())
-#     assert pipe.fit(X, y).score(X, y) > 0.4
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+@pytest.mark.parametrize("passthrough", [None, "passthrough"])
+def test_pipeline_get_tags_none(Pipeline, make_pipeline, Xyfn, passthrough):
+    # Checks that tags are set correctly when the first transformer is None or
+    # 'passthrough'
+    # Non-regression test for:
+    # https://github.com/scikit-learn/scikit-learn/issues/18815
+    pipe = make_pipeline(passthrough, SVC())
+    assert not pipe._get_tags()["pairwise"]
 
-# def test_feature_union_warns_unknown_transformer_weight():
-#     # Warn user when transformer_weights containers a key not present in
-#     # transformer_list
-#     X = [[1, 2], [3, 4], [5, 6]]
-#     y = [0, 1, 2]
-
-#     transformer_list = [("transf", Transf())]
-#     # Transformer weights dictionary with incorrect name
-#     weights = {"transformer": 1}
-#     expected_msg = (
-#         'Attempting to weight transformer "transformer", '
-#         "but it is not present in transformer_list."
-#     )
-#     union = FeatureUnion(transformer_list, transformer_weights=weights)
-#     with pytest.raises(ValueError, match=expected_msg):
-#         union.fit(X, y)
-
-# # TODO: Remove in 1.2 when get_feature_names is removed
-# def test_feature_union_get_feature_names_deprecated():
-#     """Check that get_feature_names is deprecated"""
-#     msg = "get_feature_names is deprecated in 1.0"
-#     mult2 = Mult(2)
-#     mult2.get_feature_names = lambda: ["x2"]
-
-#     ft = FeatureUnion([("m2", mult2)])
-#     with pytest.warns(FutureWarning, match=msg):
-#         ft.get_feature_names()
-
-# @pytest.mark.parametrize("passthrough", [None, "passthrough"])
-# def test_pipeline_get_tags_none(passthrough):
-#     # Checks that tags are set correctly when the first transformer is None or
-#     # 'passthrough'
-#     # Non-regression test for:
-#     # https://github.com/scikit-learn/scikit-learn/issues/18815
-#     pipe = make_pipeline(passthrough, SVC())
-#     assert not pipe._get_tags()["pairwise"]
 
 # # FIXME: Replace this test with a full `check_estimator` once we have API only
 # # checks.
-# @pytest.mark.parametrize("Predictor", [MinimalRegressor, MinimalClassifier])
-# def test_search_cv_using_minimal_compatible_estimator(Predictor):
-#     # Check that third-party library estimators can be part of a pipeline
-#     # and tuned by grid-search without inheriting from BaseEstimator.
-#     rng = np.random.RandomState(0)
-#     X, y = rng.randn(25, 2), np.array([0] * 5 + [1] * 20)
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+@pytest.mark.parametrize("Predictor", [MinimalRegressor, MinimalClassifier])
+def test_search_cv_using_minimal_compatible_estimator(Pipeline, make_pipeline,
+                                                      Xyfn, Predictor):
+    # Check that third-party library estimators can be part of a pipeline
+    # and tuned by grid-search without inheriting from BaseEstimator.
+    rng = np.random.RandomState(0)
+    X, y = rng.randn(25, 2), np.array([0] * 5 + [1] * 20)
+    X = Xyfn(X, y)
 
-#     model = Pipeline(
-#         [("transformer", MinimalTransformer()), ("predictor", Predictor())]
-#     )
-#     model.fit(X, y)
+    model = Pipeline([("transformer", MinimalTransformer()),
+                      ("predictor", Predictor())])
+    model.fit(X, y)
 
-#     y_pred = model.predict(X)
-#     if is_classifier(model):
-#         assert_array_equal(y_pred, 1)
-#         assert model.score(X, y) == pytest.approx(accuracy_score(y, y_pred))
-#     else:
-#         assert_allclose(y_pred, y.mean())
-#         assert model.score(X, y) == pytest.approx(r2_score(y, y_pred))
+    y_pred = model.predict(X)
+    if is_classifier(model):
+        assert_array_equal(y_pred, 1)
+        assert model.score(X, y) == pytest.approx(accuracy_score(y, y_pred))
+    else:
+        assert_allclose(y_pred, y.mean())
+        assert model.score(X, y) == pytest.approx(r2_score(y, y_pred))
 
-# def test_pipeline_check_if_fitted():
-#     class Estimator(BaseEstimator):
-#         def fit(self, X, y):
-#             self.fitted_ = True
-#             return self
 
-#     pipeline = Pipeline([("clf", Estimator())])
-#     with pytest.raises(NotFittedError):
-#         check_is_fitted(pipeline)
-#     pipeline.fit(iris.data, iris.target)
-#     check_is_fitted(pipeline)
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_check_if_fitted(Pipeline, make_pipeline, Xyfn):
 
-# def test_pipeline_get_feature_names_out_passes_names_through():
-#     """Check that pipeline passes names through.
+    class Estimator(BaseEstimator):
 
-#     Non-regresion test for #21349.
-#     """
-#     X, y = iris.data, iris.target
+        def fit(self, X, y):
+            self.fitted_ = True
+            return self
 
-#     class AddPrefixStandardScalar(StandardScaler):
-#         def get_feature_names_out(self, input_features=None):
-#             names = super().get_feature_names_out(input_features=input_features)
-#             return np.asarray([f"my_prefix_{name}" for name in names], dtype=object)
+    pipeline = Pipeline([("clf", Estimator())])
+    with pytest.raises(NotFittedError):
+        check_is_fitted(pipeline)
+    X = iris.data
+    y = iris.target
+    X = Xyfn(X, y)
+    pipeline.fit(X, y)
+    check_is_fitted(pipeline)
 
-#     pipe = make_pipeline(AddPrefixStandardScalar(), StandardScaler())
-#     pipe.fit(X, y)
 
-#     input_names = iris.feature_names
-#     feature_names_out = pipe.get_feature_names_out(input_names)
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (partial(Pipeline, target_col=-1), partial(
+        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+])
+def test_pipeline_get_feature_names_out_passes_names_through(
+        Pipeline, make_pipeline, Xyfn):
+    """Check that pipeline passes names through.
 
-#     assert_array_equal(feature_names_out, [f"my_prefix_{name}" for name in input_names])
+    Non-regresion test for #21349.
+    """
+    X, y = iris.data, iris.target
+    X = Xyfn(X, y)
+
+    class AddPrefixStandardScalar(StandardScaler):
+
+        def get_feature_names_out(self, input_features=None):
+            names = super().get_feature_names_out(input_features=input_features)
+            return np.asarray([f"my_prefix_{name}" for name in names],
+                              dtype=object)
+
+    pipe = make_pipeline(AddPrefixStandardScalar(), StandardScaler())
+    pipe.fit(X, y)
+
+    input_names = iris.feature_names
+    feature_names_out = pipe.get_feature_names_out(input_names)
+
+    assert_array_equal(feature_names_out,
+                       [f"my_prefix_{name}" for name in input_names])
