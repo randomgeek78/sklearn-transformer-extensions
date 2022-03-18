@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sklearn-transformer-extensions"
-version = "0.1.9"
+version = "0.2.0"
 description = """\
 Some scikit-learn transformer extensions to make using pandas dataframes in \
 scikit-learn pipelines easier."""
