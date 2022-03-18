@@ -24,18 +24,19 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-include = ["./sklearn_transformer_extensions"]
+include = ["sklearn_transformer_extensions"]
 venv = ".venv"
 venvPath = "."
 
 reportMissingImports = true
 reportMissingTypeStubs = false
 reportPrivateImportUsage = false
+useLibraryCodeForTypes = true
 
 pythonVersion = "3.8"
 pythonPlatform = "Linux"
 
-executionEnvironments = [{ root = "." }]
+executionEnvironments = [{ root = "sklearn_transformer_extensions" }]
 
 [tool.yapf]
 split_before_named_assigns=false
