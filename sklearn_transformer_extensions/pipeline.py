@@ -1,6 +1,6 @@
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline as _Pipeline, _name_estimators
-from sklearn_transformer_extensions import XyAdapter
+from sklearn_transformer_extensions import XyAdapter, XyAdapterBase
 from typing import Iterable
 from sklearn.utils.validation import check_memory
 from sklearn.pipeline import _fit_transform_one
@@ -9,17 +9,16 @@ from sklearn.utils import _print_elapsed_time
 
 class Pipeline(_Pipeline):
 
-    def __init__(self, steps, target_col=None, *, ofmt=None, memory=None,
-                 verbose=False):
+    def __init__(self, steps, *, ofmt=None, memory=None, verbose=False):
 
         if type(steps) == tuple:
             raise TypeError(
                 "Providing 'steps' as a tuple is not supported. Please"
                 " provide 'steps' as a list.")
 
-        self.target_col = target_col
         self.ofmt = ofmt
         self.steps_ = steps
+        steps = list(steps)  # shallow copy
 
         super().__init__(steps, memory=memory, verbose=verbose)
 
@@ -32,11 +31,11 @@ class Pipeline(_Pipeline):
         # Shallow copy
         steps = list(steps)
         for i, (name, trans) in enumerate(steps):
-            if hasattr(trans, "transformer"):
+            if isinstance(trans, XyAdapterBase):
                 trans = trans.transformer
             if trans in ['passthrough', None]:
                 continue
-            steps[i] = (name, XyAdapter(trans, self.target_col, ofmt=self.ofmt))
+            steps[i] = (name, XyAdapter(trans, ofmt=self.ofmt))
 
         self.steps__ = steps
         return self
@@ -107,7 +106,6 @@ class Pipeline(_Pipeline):
                 else:
                     transformer = transformer.transformer
                     cloned_transformer = XyAdapter(clone(transformer),
-                                                   self.target_col,
                                                    ofmt=self.ofmt)
             elif hasattr(memory, "cachedir"):
                 # joblib < 0.11
@@ -118,12 +116,11 @@ class Pipeline(_Pipeline):
                 else:
                     transformer = transformer.transformer
                     cloned_transformer = XyAdapter(clone(transformer),
-                                                   self.target_col,
                                                    ofmt=self.ofmt)
             else:
                 transformer = transformer.transformer
                 cloned_transformer = XyAdapter(clone(transformer),
-                                               self.target_col, ofmt=self.ofmt)
+                                               ofmt=self.ofmt)
 
             # Fit or load from cache the current transformer
             X, fitted_transformer = fit_transform_one_cached(  # type: ignore
@@ -142,8 +139,7 @@ class Pipeline(_Pipeline):
         return X
 
 
-def make_pipeline(*steps, target_col=None, ofmt=None, memory=None,
-                  verbose=False):
+def make_pipeline(*steps, ofmt=None, memory=None, verbose=False):
     """Construct a :class:`Pipeline` from the given estimators.
 
     This is a shorthand for the :class:`Pipeline` constructor; it does not
@@ -188,5 +184,5 @@ def make_pipeline(*steps, target_col=None, ofmt=None, memory=None,
     Pipeline(steps=[('standardscaler', StandardScaler()),
                     ('gaussiannb', GaussianNB())])
     """
-    return Pipeline(_name_estimators(steps), target_col, ofmt=ofmt,
-                    memory=memory, verbose=verbose)
+    return Pipeline(_name_estimators(steps), ofmt=ofmt, memory=memory,
+                    verbose=verbose)

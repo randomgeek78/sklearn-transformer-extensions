@@ -7,7 +7,7 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
     check_is_fitted,
     _check_feature_names_in,
-    _num_features,
+    _make_indexable,
 )
 import numpy as np
 from typing import Iterable, Any
@@ -21,9 +21,42 @@ except:
 import re
 from sklearn.exceptions import NotFittedError
 
-from collections import namedtuple
 
-XyData = namedtuple('XyData', ['X', 'y'])
+class XyData:
+
+    def __init__(self, X, y):
+
+        self.X, self.y = _make_indexable((X, y))
+
+    def __getitem__(self, ind):
+
+        X = _safe_indexing(self.X, ind)
+        y = _safe_indexing(self.y, ind)
+
+        return XyData(X, y)
+
+    def __len__(self):
+
+        return len(self.X)
+
+    def __iter__(self):
+
+        return iter((self.X, self.y))
+
+    def __repr__(self):
+
+        tx = 'numpy'
+        if hasattr(self.X, "iloc"):
+            tx = 'pandas'
+        sx = self.X.shape
+
+        ty = 'numpy'
+        if hasattr(self.y, "iloc"):
+            ty = 'pandas'
+        sy = self.y.shape
+
+        format = dict(name=self.__class__.__name__, tx=tx, sx=sx, ty=ty, sy=sy)
+        return '{name}(X={tx}({sx}), y={ty}({sy}))'.format(**format)
 
 
 class XyAdapterStub(object):
@@ -34,10 +67,14 @@ class XyAdapterStub(object):
         return obj
 
 
+class XyAdapterBase:
+    pass
+
+
 def XyAdapterFactory(klass):
 
     # https://stackoverflow.com/questions/4647566/pickle-a-dynamically-parameterized-sub-class
-    class XyAdapter(klass):
+    class XyAdapter(klass, XyAdapterBase):
         """An adapter class that enables interaction with scikit-learn transformers
         and estimators using an input numpy array or pandas dataframe that contains
         both features (X) and labels (y).
@@ -68,9 +105,6 @@ def XyAdapterFactory(klass):
         ----------
         transformer: a single estimator or transformer instance, required
             The estimator or group of estimators to be cloned.
-        target_col : list[str], list[int], str, int or None, default=None
-            The columns to pry away from the input X that correspond to the labels
-            (y) before calling the underlying transformer.
         ofmt: 'pandas', 'numpy', None, default=None
             The output format for returns from methods. 'pandas' returns either a
             DataFrame or Series. 'numpy' returns a 2-d or 1-d numpy array. None
@@ -88,34 +122,29 @@ def XyAdapterFactory(klass):
         datastructure that contains both X and y.
 
         >>> from sklearn_transformer_extensions import XyAdapter
+        >>> from sklearn_transformer_extensions import XyData
         >>> from sklearn.datasets import load_iris
         >>> from sklearn.linear_model import LogisticRegression
         >>> import numpy as np
         >>> X, y = load_iris(return_X_y=True)
-        >>> train = np.hstack((X, y.reshape((-1, 1))))
-        >>> clf = XyAdapter(LogisticRegression(random_state=0), target_col=4)
-        >>> clf.fit(train)
-        XyAdapter(target_col=[4], transformer=LogisticRegression(random_state=0))
+        >>> Xy = XyData(X, y)
+        >>> clf = XyAdapter(LogisticRegression(random_state=0))
+        >>> clf.fit(Xy)
+        XyAdapter(transformer=LogisticRegression(random_state=0))
         >>> clf.predict(X[:2, :])
         array([0., 0.])
         >>> clf.predict_proba(X[:2, :])
         array([[9.8...e-01, 1.8...e-02, 1.4...e-08],
                [9.7...e-01, 2.8...e-02, ...e-08]])
-        >>> clf.score(train)
+        >>> clf.score(Xy)
         0.97...
         """
 
-        def __init__(self, transformer, target_col=None, *, ofmt=None):
+        def __init__(self, transformer, *, ofmt=None):
 
             self.transformer = transformer
 
-            assert isinstance(target_col,
-                              (type(None), str, int, slice, Iterable))
-            self.target_col = target_col
-
-            assert isinstance(ofmt, (type(None), str))
-            if isinstance(ofmt, str):
-                assert ofmt in ['pandas', 'numpy']
+            assert ofmt in ['pandas', 'numpy', None]
             self.ofmt = ofmt
 
         @if_delegate_has_method("transformer")
@@ -140,7 +169,7 @@ def XyAdapterFactory(klass):
                     object.__getattribute__(self, "transformer"), name)
 
         def __hash__(self):
-            return hash((self.transformer, self.target_col, self.ofmt))
+            return hash((self.transformer, self.ofmt))
 
         def __eq__(self, other):
             if isinstance(other, self.transformer.__class__):
@@ -191,8 +220,13 @@ def XyAdapterFactory(klass):
                   **params):
 
             y = None
-            if isinstance(X, XyData):
+            if type(X) == XyData:
                 X, y = X.X, X.y
+
+            if hasattr(self, "_check_feature_names"):
+                self._check_feature_names(X, reset=reset)
+            if hasattr(self, "_check_n_features"):
+                self._check_n_features(X, reset=reset)
 
             ofmt = self._check_ofmt(X)
 
@@ -286,7 +320,6 @@ def XyAdapterFactory(klass):
     return XyAdapter
 
 
-def XyAdapter(transformer, target_col=None, *, ofmt=None):
+def XyAdapter(transformer, *, ofmt=None):
     klass = transformer.__class__
-    return XyAdapterFactory(klass)(transformer, target_col=target_col,
-                                   ofmt=ofmt)
+    return XyAdapterFactory(klass)(transformer, ofmt=ofmt)

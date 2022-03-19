@@ -78,10 +78,11 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import LocalOutlierFactor
-from sklearn.pipeline import make_pipeline
+from sklearn_transformer_extensions.pipeline import make_pipeline
 from sklearn_transformer_extensions import XyAdapter
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
+from sklearn_transformer_extensions import XyData
 
 df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
 print(df_train)
@@ -102,8 +103,7 @@ class LocalOutlierFilter(TransformerMixin, BaseEstimator):
     return self
   # We want to filter the train data
   def fit_transform(self, X, y=None, **fit_params):
-    self.transformer_ = clone(self.transformer)
-    mask = self.transformer_.fit_predict(X, y, **fit_params)
+    mask = self.transformer.fit_predict(X, **fit_params)
     if hasattr(X, "iloc"):
       X = X.iloc
     return X[mask > 0, :]
@@ -112,7 +112,7 @@ class LocalOutlierFilter(TransformerMixin, BaseEstimator):
     return X
 
 lof = LocalOutlierFilter(n_neighbors=2)
-lr = XyAdapter(LinearRegression(), "y")
+lr = LinearRegression()
 
 # Single pipeline w/ train set filtering possible
 # This pipeline can also be used to tune filter parameters like n_neighbors
@@ -120,7 +120,10 @@ lr = XyAdapter(LinearRegression(), "y")
 p = make_pipeline(lof, lr)
 
 # Train
-p.fit(df_train)
+y = df_train.pop('y')
+X = df_train
+Xy = XyData(X, y)
+p.fit(Xy)
 
 # Predict
 df_test = pd.DataFrame({"x": np.arange(10, 17)})

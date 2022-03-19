@@ -276,7 +276,7 @@ def test_pipeline_init_tuple(Pipeline):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=None), lambda X, y: XyData(X, y)),
+    (Pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_methods_anova(Pipeline, Xyfn):
     # Test the various methods of the pipeline (anova).
@@ -314,7 +314,7 @@ def test_pipeline_fit_params(Pipeline):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X: X),
-    (partial(Pipeline, target_col=None), lambda X: X),
+    (Pipeline, lambda X: X),
 ])
 def test_pipeline_sample_weight_supported(Pipeline, Xyfn):
     # Pipeline should pass sample_weight
@@ -330,7 +330,7 @@ def test_pipeline_sample_weight_supported(Pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X: X),
-    (partial(Pipeline, target_col=None), lambda X: X),
+    (Pipeline, lambda X: X),
 ])
 def test_pipeline_sample_weight_unsupported(Pipeline, Xyfn):
     # When sample_weight is None it shouldn't be passed
@@ -365,10 +365,9 @@ def test_pipeline_raise_set_params_error(Pipeline):
         pipe.set_params(fake__estimator="nope")
 
 
-@pytest.mark.parametrize(
-    "Pipeline,Xyfn",
-    [(_Pipeline, lambda X, y: X),
-     (partial(Pipeline, target_col=None), lambda X, y: XyData(X, y))])
+@pytest.mark.parametrize("Pipeline,Xyfn",
+                         [(_Pipeline, lambda X, y: X),
+                          (Pipeline, lambda X, y: XyData(X, y))])
 def test_pipeline_methods_pca_svm(Pipeline, Xyfn):
     # Test the various methods of the pipeline (pca + svm).
     X = iris.data
@@ -387,7 +386,7 @@ def test_pipeline_methods_pca_svm(Pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X: X),
-    (partial(Pipeline, target_col=None), lambda X: X),
+    (Pipeline, lambda X: X),
 ])
 def test_pipeline_score_samples_pca_lof(Pipeline, Xyfn):
     X = iris.data
@@ -408,7 +407,7 @@ def test_pipeline_score_samples_pca_lof(Pipeline, Xyfn):
 
 @pytest.mark.parametrize("make_pipeline,Xyfn", [
     (_make_pipeline, lambda X, y: X),
-    (partial(make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_score_samples_on_pipeline_without_score_samples(make_pipeline, Xyfn):
     X = np.array([[1], [2]])
@@ -427,8 +426,7 @@ def test_score_samples_on_pipeline_without_score_samples(make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_methods_preprocessing_svm(Pipeline, make_pipeline, Xyfn):
     # Test the various methods of the pipeline (preprocessing + svm).
@@ -464,8 +462,7 @@ def test_pipeline_methods_preprocessing_svm(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_fit_predict_on_pipeline(Pipeline, make_pipeline, Xyfn):
     # test that the fit_predict method is implemented on a pipeline
@@ -490,10 +487,7 @@ def test_fit_predict_on_pipeline(Pipeline, make_pipeline, Xyfn):
     assert_array_almost_equal(pipeline_pred, separate_pred)
 
 
-@pytest.mark.parametrize("Pipeline", [
-    _Pipeline,
-    partial(Pipeline, target_col=None),
-])
+@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
 def test_fit_predict_on_pipeline_without_fit_predict(Pipeline):
     # tests that a pipeline does not have fit_predict method when final
     # step of pipeline does not have fit_predict defined
@@ -506,10 +500,7 @@ def test_fit_predict_on_pipeline_without_fit_predict(Pipeline):
         getattr(pipe, "fit_predict")
 
 
-@pytest.mark.parametrize("Pipeline", [
-    _Pipeline,
-    partial(Pipeline, target_col=None),
-])
+@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
 def test_fit_predict_with_intermediate_fit_params(Pipeline):
     # tests that Pipeline passes fit_params to intermediate steps
     # when fit_predict is invoked
@@ -521,10 +512,7 @@ def test_fit_predict_with_intermediate_fit_params(Pipeline):
     assert "should_succeed" not in pipe.named_steps["transf"].fit_params
 
 
-@pytest.mark.parametrize("Pipeline", [
-    _Pipeline,
-    partial(Pipeline, target_col=None),
-])
+@pytest.mark.parametrize("Pipeline", [_Pipeline, Pipeline])
 @pytest.mark.parametrize("method_name",
                          ["predict", "predict_proba", "predict_log_proba"])
 def test_predict_methods_with_predict_params(Pipeline, method_name):
@@ -540,8 +528,7 @@ def test_predict_methods_with_predict_params(Pipeline, method_name):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=None), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+    (Pipeline, lambda X, y: np.hstack((X, np.atleast_2d(y).T))),
 ])
 def test_pipeline_transform(Pipeline, Xyfn):
     # Test whether pipeline works with a transformer at the end.
@@ -564,8 +551,7 @@ def test_pipeline_transform(Pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+    (Pipeline, lambda X, y: np.hstack((X, np.atleast_2d(y).T))),
 ])
 def test_pipeline_fit_transform(Pipeline, Xyfn):
     # Test whether pipeline works with a transformer missing fit_transform
@@ -696,8 +682,7 @@ def test_pipeline_named_steps(Pipeline):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+    (Pipeline, lambda X, y: np.hstack((X, np.atleast_2d(y).T))),
 ])
 @pytest.mark.parametrize("passthrough", [None, "passthrough"])
 def test_pipeline_correctly_adjusts_steps(Pipeline, Xyfn, passthrough):
@@ -722,8 +707,7 @@ def test_pipeline_correctly_adjusts_steps(Pipeline, Xyfn, passthrough):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 @pytest.mark.parametrize("passthrough", [None, "passthrough"])
 def test_set_pipeline_step_passthrough(Pipeline, make_pipeline, Xyfn,
@@ -771,7 +755,7 @@ def test_set_pipeline_step_passthrough(Pipeline, make_pipeline, Xyfn,
         "verbose": False,
     }
     if Pipeline is not _Pipeline:
-        expected.update(dict(ofmt=None, target_col=-1))
+        expected.update(dict(ofmt=None))
     assert pipeline.get_params(deep=True) == expected
 
     pipeline.set_params(m2=passthrough)
@@ -884,8 +868,7 @@ def test_make_pipeline(make_pipeline):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_classes_property(Pipeline, make_pipeline, Xyfn):
     X = iris.data
@@ -913,8 +896,7 @@ def test_set_params_nested_pipeline(Pipeline):
 
 @pytest.mark.parametrize("Pipeline,Xyfn", [
     (_Pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+    (Pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_wrong_memory(Pipeline, Xyfn):
     # Test that an error is raised when memory is not a string or a Memory
@@ -961,8 +943,7 @@ def test_pipeline_with_cache_attribute(Pipeline):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_memory(Pipeline, make_pipeline, Xyfn):
     X = iris.data
@@ -1032,12 +1013,11 @@ def test_pipeline_memory(Pipeline, make_pipeline, Xyfn):
         shutil.rmtree(cachedir)
 
 
-@pytest.mark.parametrize("make_pipeline,Xyfn", [
-    (_make_pipeline, lambda X, y: X),
-    (partial(make_pipeline, target_col=-1), lambda X, y: np.hstack(
-        (X, np.atleast_2d(y).T))),
+@pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
+    (_Pipeline, _make_pipeline, lambda X, y: X),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
-def test_make_pipeline_memory(make_pipeline, Xyfn):
+def test_make_pipeline_memory(Pipeline, make_pipeline, Xyfn):
     cachedir = mkdtemp()
     if parse_version(joblib.__version__) < parse_version("0.12"):
         # Deal with change of API in joblib
@@ -1068,8 +1048,7 @@ class FeatureNameSaver(BaseEstimator):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_features_names_passthrough(Pipeline, make_pipeline, Xyfn):
     """Check pipeline.get_feature_names_out with passthrough"""
@@ -1091,8 +1070,7 @@ def test_features_names_passthrough(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_feature_names_count_vectorizer(Pipeline, make_pipeline, Xyfn):
     """Check pipeline.get_feature_names_out with vectorizers"""
@@ -1114,8 +1092,7 @@ def test_feature_names_count_vectorizer(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_feature_names_out_error_without_definition(
         Pipeline, make_pipeline, Xyfn):
@@ -1135,8 +1112,7 @@ def test_pipeline_feature_names_out_error_without_definition(
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_param_error(Pipeline, make_pipeline, Xyfn):
     clf = make_pipeline(LogisticRegression())
@@ -1184,8 +1160,7 @@ def test_verbose(est, method, pattern, capsys):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_n_features_in_pipeline(Pipeline, make_pipeline, Xyfn):
     # make sure pipelines delegate n_features_in to the first step
@@ -1216,8 +1191,7 @@ def test_n_features_in_pipeline(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_missing_values_leniency(Pipeline, make_pipeline, Xyfn):
     # check that pipeline let the missing values validation to
@@ -1232,8 +1206,7 @@ def test_pipeline_missing_values_leniency(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 @pytest.mark.parametrize("passthrough", [None, "passthrough"])
 def test_pipeline_get_tags_none(Pipeline, make_pipeline, Xyfn, passthrough):
@@ -1249,8 +1222,7 @@ def test_pipeline_get_tags_none(Pipeline, make_pipeline, Xyfn, passthrough):
 # # checks.
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 @pytest.mark.parametrize("Predictor", [MinimalRegressor, MinimalClassifier])
 def test_search_cv_using_minimal_compatible_estimator(Pipeline, make_pipeline,
@@ -1276,8 +1248,7 @@ def test_search_cv_using_minimal_compatible_estimator(Pipeline, make_pipeline,
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_check_if_fitted(Pipeline, make_pipeline, Xyfn):
 
@@ -1299,8 +1270,7 @@ def test_pipeline_check_if_fitted(Pipeline, make_pipeline, Xyfn):
 
 @pytest.mark.parametrize("Pipeline,make_pipeline,Xyfn", [
     (_Pipeline, _make_pipeline, lambda X, y: X),
-    (partial(Pipeline, target_col=-1), partial(
-        make_pipeline, target_col=-1), lambda X, y: XyData(X, y)),
+    (Pipeline, make_pipeline, lambda X, y: XyData(X, y)),
 ])
 def test_pipeline_get_feature_names_out_passes_names_through(
         Pipeline, make_pipeline, Xyfn):
