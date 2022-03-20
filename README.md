@@ -124,7 +124,7 @@ Pipeline(steps=[('localoutlierfilter', LocalOutlierFilter(n_neighbors=2)),
 # Check if the filter is actually filtering train set
 >>> Xty = p[0].fit_transform(Xy)
 >>> print(Xty)
-XyData(X=pandas(shape=(4, 1)), y=pandas(shape=(4,)))
+XyData(X=numpy(shape=(4, 1)), y=numpy(shape=(4,)))
 
 >>> print(np.hstack((Xty.X, np.c_[Xty.y])))
 [[0 0]
@@ -180,4 +180,6 @@ introduced `get_feature_names_out` interface in order to get output
 
 The package also provides drop-in replacements to `ColumnTransformer` and
 `FunctionTransformer` provide additional functionality. Please refer to their
-documentation for more details.
+documentation for more details. The package's core functionality has been
+extensively tested by extending scikit-learn's tests for `Pipeline`,
+`ColumnTransformer` and `FunctionTransformer`.
