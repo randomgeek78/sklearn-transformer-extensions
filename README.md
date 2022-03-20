@@ -22,7 +22,7 @@ current `scikit-learn` API. Our goal is to overcome this limitation by using
 The unified pipeline can also be used for for end-to-end grid search and
 cross-validation.
 
-```console
+```python
 >>> import pandas as pd
 >>> import numpy as np
 >>> from sklearn.linear_model import LinearRegression
@@ -80,7 +80,7 @@ the transformed features and labels is passed around as the "features" while
 the labels as far as the pipeline is concerned is always None. As far as the
 pipeline is concerned, it is dealing with an unsupervised learning scenario.
 
-```console
+```python
 >>> import pandas as pd
 >>> import numpy as np
 >>> from sklearn.base import BaseEstimator, TransformerMixin, clone
