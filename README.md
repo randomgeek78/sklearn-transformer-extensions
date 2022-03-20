@@ -8,7 +8,10 @@ factory that can wrap around any scikit-learn transformer/estimator. The
 wrapped class retains the original class' API and methods while providing an
 additional interface to call the methods - it allows taking a `XyData` type
 object as the X argument in which case this object is used to provide both the
-features and labels.
+features and labels. The XyAdapter-adapted class can be used alongside
+non-adapted transformers/estimators in a pipeline. If all steps in a pipeline
+need to be adapted, then we provide a convenience replacements to `Pipeline` and
+`make_pipeline` as well that automatically adapt all steps.
 
 In addition, this package provides drop-in replacements to `ColumnTransformer`
 and `FunctionTransformer` that extend their functionality and make them more
@@ -23,67 +26,51 @@ The unified pipeline can also be used for for end-to-end grid search and
 cross-validation.
 
 ```python
->>> import pandas as pd
 >>> import numpy as np
 >>> from sklearn.linear_model import LinearRegression
 >>> from sklearn.neighbors import LocalOutlierFactor
->>> from sklearn.pipeline import make_pipeline
 
 # Create data with outlier (X, y) = (4, 100)
->>> df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
->>> print(df_train)
-   x    y
-0  0    0
-1  1    2
-2  2    4
-3  3    6
-4  4  100
+>>> X, y = np.c_[0, 1, 2, 3, 4].T, np.r_[0, 2, 4, 6, 100]
+>>> Xy = np.hstack((X, np.c_[y]))
+>>> print(Xy)
+[[  0   0]
+ [  1   2]
+ [  2   4]
+ [  3   6]
+ [  4 100]]
 
 # Remove outlier
 >>> lof = LocalOutlierFactor(n_neighbors=2)
->>> mask = lof.fit_predict(df_train)
+>>> mask = lof.fit_predict(Xy)
 >>> print(mask)
 [ 1  1  1  1 -1]
 
 # Filter outlier
->>> df_filtered = df_train.iloc[mask > 0, :]
+>>> X_filt, y_filt = X[mask > 0, :], y[mask > 0]
 
 # Fit model to cleaned data
 >>> lr = LinearRegression()
->>> lr.fit(df_filtered[["x"]], df_filtered["y"])
+>>> lr.fit(X_filt, y_filt)
 LinearRegression()
 
 # Predict
->>> df_test = pd.DataFrame({"x": np.arange(10, 17)})
->>> print(lr.predict(df_test[["x"]]))
+>>> X_test = np.c_[np.arange(10, 17)]
+>>> print(lr.predict(X_test))
 [20. 22. 24. 26. 28. 30. 32.]
 
 ```
 
 The filtering step cannot be combined with the modeling step as part of a
-unified pipeline. This is because, at any step of the pipeline, a transformer
-only gets to influence the features and not the labels that are seen by the
-steps that follow. Thus, transformer steps that affect the number of rows will
-make the features and labels mismatched.
+unified pipeline. This is because Pipeline calls all transformer and estimator
+steps during fitting with the same `y` argument. Any steps that filter data
+would make the features and labels go out-of-sync.
 
-The solution is to keep the X and y together in the external API of any
-individual pipeline step so both the features and labels are passed around
-together as they move through the pipeline and are thus always in sync. We
-implemented the `XyAdapter` that receives the combined X and y object and knows
-how to split them into the features and labels and transparently interface with
-a `scikit-learn` transformer or estimator method that require them to be
-separate function arguments. Upon receiving the transformed features from the
-underlying transformer, the `XyAdapter` class then packages the transformed
-features and original labels and returns the combined data-structure. This way,
-external to the `XyAdapter` class, a combined data-structure that contains both
-the transformed features and labels is passed around as the "features" while
-the labels as far as the pipeline is concerned is always None. As far as the
-pipeline is concerned, it is dealing with an unsupervised learning scenario.
+The solution is to keep the X and y together as they move from one step of the
+pipeline to the next.
 
 ```python
->>> import pandas as pd
 >>> import numpy as np
->>> from sklearn.base import BaseEstimator, TransformerMixin, clone
 >>> from sklearn.linear_model import LinearRegression
 >>> from sklearn.neighbors import LocalOutlierFactor
 >>> from sklearn.pipeline import make_pipeline
@@ -91,16 +78,12 @@ pipeline is concerned, it is dealing with an unsupervised learning scenario.
 >>> from sklearn.model_selection import KFold
 >>> from sklearn_transformer_extensions import XyAdapter, XyData
 
->>> df_train = pd.DataFrame({"x": [0, 1, 2, 3, 4], "y": [0, 2, 4, 6, 100]})
->>> print(df_train)
-   x    y
-0  0    0
-1  1    2
-2  2    4
-3  3    6
-4  4  100
+# Same data as earlier example
+>>> X, y = np.c_[0, 1, 2, 3, 4].T, np.r_[0, 2, 4, 6, 100]
+>>> Xy = np.hstack((X, np.c_[y]))
 
-
+# LocalOutlierFilter receives a XyData object, filters it and generates a new
+# XyData object.
 >>> class LocalOutlierFilter(LocalOutlierFactor):
 ...   # We want to filter the train data
 ...   def fit_transform(self, Xy, _=None, **fit_params):
@@ -109,30 +92,33 @@ pipeline is concerned, it is dealing with an unsupervised learning scenario.
 ...     y = np.atleast_2d(y).T
 ...     X = np.hstack((X, y))
 ...     mask = self.fit_predict(X, **fit_params)
-...     X, y = Xy
-...     return XyData(X.iloc[mask > 0, :], y.iloc[mask > 0])
+...     return Xy[mask > 0]
 ...   # We don't filter the test data
 ...   def transform(self, X):
 ...     return X
 
 >>> lof = LocalOutlierFilter(n_neighbors=2)
+
+# LinearRegression needs to be adapted to make it accept a XyData object.
+# XyAdapter takes a transformer/estimator class and returns derived class with
+# the original class as its parent. In all aspects, the derived class behaviors
+# identically to the original class except it now also accepts a XyData object.
 >>> lr = XyAdapter(LinearRegression)()
 
-# Single pipeline w/ train set filtering possible
-# This pipeline can also be used to tune filter parameters like n_neighbors
-# using grid search
+# Create a single pipeline that first filters data and then models it. This
+# pipeline can also be used to tune filter parameters like n_neighbors using
+# grid search.
 >>> p = make_pipeline(lof, lr)
 
 # Train
->>> X, y = df_train.loc[:, df_train.columns != 'y'], df_train.loc[:, 'y']
 >>> Xy = XyData(X, y)
 >>> p.fit(Xy)
 Pipeline(steps=[('localoutlierfilter', LocalOutlierFilter(n_neighbors=2)),
                 ('linearregression', LinearRegression())])
 
 # Predict
->>> df_test = pd.DataFrame({"x": np.arange(10, 17)})
->>> print(p.predict(df_test[["x"]]))
+>>> X_test = np.atleast_2d(np.arange(10, 17)).T
+>>> print(p.predict(X_test))
 [20. 22. 24. 26. 28. 30. 32.]
 
 # Check if the filter is actually filtering train set
@@ -140,12 +126,11 @@ Pipeline(steps=[('localoutlierfilter', LocalOutlierFilter(n_neighbors=2)),
 >>> print(Xty)
 XyData(X=pandas(shape=(4, 1)), y=pandas(shape=(4,)))
 
->>> pd.concat(Xty, axis=1)
-   x  y
-0  0  0
-1  1  2
-2  2  4
-3  3  6
+>>> print(np.hstack((Xty.X, np.c_[Xty.y])))
+[[0 0]
+ [1 2]
+ [2 4]
+ [3 6]]
 
 # Perform joint grid search of both the filtering step and the modeling step.
 >>> kfolds = KFold(n_splits=2, shuffle=True, random_state=42)
@@ -166,6 +151,7 @@ GridSearchCV(cv=KFold(n_splits=2, random_state=42, shuffle=True),
                          'localoutlierfilter__n_neighbors': (1, 2)},
              refit=False, return_train_score=True)
 
+>>> import pandas as pd
 >>> results = pd.DataFrame({
 ...   "n_neighbors": gs.cv_results_['param_localoutlierfilter__n_neighbors'],
 ...   "fit_intercept": gs.cv_results_['param_linearregression__fit_intercept'],
@@ -186,6 +172,12 @@ GridSearchCV(cv=KFold(n_splits=2, random_state=42, shuffle=True),
 Since both the filter and the estimator are part of the same pipeline, we were
 able to jointly optimize the parameters for both. 
 
-Apart from `XyAdapter`, the drop-in replacements to `ColumnTransformer` and
+In addition to extending the interface to scikit-learn's estimators and
+transformers so it an XyData object, the adapted object also outputs a pandas
+`DataFrame` if the input is a pandas `DataFrame`. It relies on the newly
+introduced `get_feature_names_out` interface in order to get output
+`DataFrame`'s column names.
+
+The package also provides drop-in replacements to `ColumnTransformer` and
 `FunctionTransformer` provide additional functionality. Please refer to their
 documentation for more details.
