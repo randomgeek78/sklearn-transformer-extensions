@@ -12,6 +12,7 @@ python = "^3.8"
 scikit-learn = "^1.0.0"
 numpy = "*"
 pandas = {version = "*", optional = true}
+xgboost = "^1.5.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"

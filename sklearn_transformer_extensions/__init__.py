@@ -1,6 +1,6 @@
 __version__ = '0.2.0'
 
-from .base import XyAdapter, XyAdapterBase, XyData
+from .xyadapter import XyAdapter, XyAdapterBase, XyData
 
 __all__ = [
     "compose",
