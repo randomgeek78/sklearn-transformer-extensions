@@ -26,10 +26,43 @@ from sklearn.exceptions import NotFittedError
 
 class XyData:
 
-    def __init__(self, X, y):
+    """XyData object holds both the features and labels in the same
+    data-structure. It implements a iterator interface as well as an indexing
+    interface. Scikit-learn treats it as a numpy array since it provides a
+    shape attribute.
 
-        if type(X) == XyData:
-            breakpoint()
+    Parameters
+    ----------
+    X, y: An iterable, pandas dataframe, numpy array
+        Both X and y need to be the same length
+
+    Attributes
+    ----------
+    X, y
+
+    Examples
+    --------
+    >>> from sklearn_transformer_extensions import XyData
+    >>> import numpy as np
+    >>> X = np.c_[1, 2, 3].T
+    >>> y = np.r_[2, 4, 6]
+    >>> Xy = XyData(X, y)
+    >>> print(Xy)
+    XyData(X=numpy(shape=(3, 1)), y=numpy(shape=(3,)))
+    >>> print(Xy.X.shape, Xy.y.shape)
+    (3, 1) (3,)
+    >>> X_, y_ = Xy
+    >>> print(X_.shape, y_.shape)
+    (3, 1) (3,)
+    >>> Xy_subset = Xy[:2]
+    >>> print(Xy_subset)
+    XyData(X=numpy(shape=(2, 1)), y=numpy(shape=(2,)))
+    >>> print(Xy_subset.X, Xy_subset.y)
+    [[1]
+     [2]] [2 4]
+    """
+
+    def __init__(self, X, y):
 
         self.X, self.y = _make_indexable((X, y))
 
