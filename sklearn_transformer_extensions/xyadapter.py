@@ -82,73 +82,62 @@ class XyAdapterBase:
 
 def XyAdapterFactory(klass):
 
+    """An adapter that specializes a given klass object (which expected to
+    be a scikit-learn transformer or estimator class) so all of klass'
+    methods like `fit`, `transform`, etc now accept a XyData object in
+    addition to accepting X and y as separate arguments (default behavior).
+
+    Internally, if the input to a method is an XyData object, the adapter
+    splits the input into features (X) and labels (y) before calling the
+    corresponding scikit-learn object's method. If the input is not an
+    XyData object, then the X and y arguments to the function are passed
+    through as is effecting scikit-learn's traditional behavior.
+
+    For transformers, the returned value from scikit-learn object's
+    `fit_transform` and `transform` method calls are combined with labels
+    (if exists) to create new XyData object and returned. If the original
+    features (X) was pandas `DataFrame`, the returned transformed features
+    is also a pandas `DataFrame`. The column names are obtained from
+    scikit-learn's new `get_feature_names_out` interface. If scikit-learn's
+    object does not provide this method, then we retain the original
+    DataFrame's columns.
+
+    Parameters
+    ----------
+    Same as the base class which is expected to be a scikit-learn
+    transformer or estimator.
+        
+    Attributes
+    ----------
+    Same as the base class.
+
+    Examples
+    --------
+
+    In this example, we recreate the example from scikit-learn's
+    LogisticRegression documentation.
+
+    >>> from sklearn_transformer_extensions import XyAdapter, XyData
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.linear_model import LogisticRegression
+    >>> import numpy as np
+    >>> X, y = load_iris(return_X_y=True)
+    >>> Xy = XyData(X, y)
+    >>> clf = XyAdapter(LogisticRegression)(random_state=0)
+    >>> clf.fit(Xy)
+    LogisticRegression(random_state=0)
+    >>> clf.predict(X[:2, :])
+    array([0, 0])
+    >>> clf.predict_proba(X[:2, :])
+    array([[9.8...e-01, 1.8...e-02, 1.4...e-08],
+           [9.7...e-01, 2.8...e-02, ...e-08]])
+    >>> clf.score(Xy)
+    0.97...
+
+    """
+
     # https://stackoverflow.com/questions/4647566/pickle-a-dynamically-parameterized-sub-class
     class XyAdapter(klass, XyAdapterBase):
-        """An adapter class that enables interaction with scikit-learn transformers
-        and estimators using an input numpy array or pandas dataframe that contains
-        both features (X) and labels (y).
-
-        Internally, for any method call, the adapter splits the input into features
-        (X) and labels (y) and transparently calls the same method in the underlying
-        transformer or estimator instance (if exists) with the split features and
-        labels (as needed).
-
-        The returned object from the call to the underlying transformer or
-        estimator is forwarded to the external caller. For `fit_transform` and
-        `transform` method calls, the returned object is the transformed features
-        (X). For these two methods, the transformed features are combined with the
-        labels (y) before returning to the external caller.
-
-        For the `fit_transform` and `transform` method calls, the user can specify
-        if the output should be a numpy array or a pandas dataframe. If the output
-        format is pandas dataframe, then the underlying transformer's
-        get_feature_names_out or get_feature_names method is called (if exists) to
-        infer the column names of the returned object. If these don't exist, then
-        the column names from the input dataframe are used. We run into an error if
-        all these following conditions hold: a) the requested format is a
-        dataframe, b) transformer does not provide either the get_feature_names_out
-        or the get_feature_names methods, c) the transformed object contains a
-        different number of columns from the input dataframe/array. 
-
-        Parameters
-        ----------
-        transformer: a single estimator or transformer instance, required
-            The estimator or group of estimators to be cloned.
-        ofmt: 'pandas', 'numpy', None, default=None
-            The output format for returns from methods. 'pandas' returns either a
-            DataFrame or Series. 'numpy' returns a 2-d or 1-d numpy array. None
-            keeps the output format the same as the input. 
-            
-        Attributes
-        ----------
-        transformer_: a fitted instance of the estimator or transformer
-
-        Examples
-        --------
-
-        In this example, we recreate the example from scikit-learn's
-        LogisticRegression documentation. We directly work with the train
-        datastructure that contains both X and y.
-
-        >>> from sklearn_transformer_extensions import XyAdapter
-        >>> from sklearn_transformer_extensions import XyData
-        >>> from sklearn.datasets import load_iris
-        >>> from sklearn.linear_model import LogisticRegression
-        >>> import numpy as np
-        >>> X, y = load_iris(return_X_y=True)
-        >>> Xy = XyData(X, y)
-        >>> clf = XyAdapter(LogisticRegression(random_state=0))
-        >>> clf.fit(Xy)
-        XyAdapter(transformer=LogisticRegression(random_state=0))
-        >>> clf.predict(X[:2, :])
-        array([0., 0.])
-        >>> clf.predict_proba(X[:2, :])
-        array([[9.8...e-01, 1.8...e-02, 1.4...e-08],
-               [9.7...e-01, 2.8...e-02, ...e-08]])
-        >>> clf.score(Xy)
-        0.97...
-        """
-
         def get_params(self, deep: bool = True) -> Dict[str, Any]:
             # from xgboost/get_params
             params = super().get_params(deep)

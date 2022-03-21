@@ -45,4 +45,4 @@ allow_split_before_dict_value=false
 column_limit=80
 
 [tool.pytest.ini_options]
-addopts="--pdbcls=IPython.terminal.debugger:TerminalPdb"
+addopts="--pdbcls=IPython.terminal.debugger:TerminalPdb --doctest-modules --doctest-glob='*.md'"
