@@ -426,7 +426,7 @@ def test_score_samples_on_pipeline_without_score_samples(make_pipeline, Xyfn):
     if make_pipeline is _make_pipeline:
         match = "'LogisticRegression' object has no attribute 'score_samples'"
     else:
-        match = "type object 'LogisticRegression' has no attribute 'score_samples'"
+        match = "This 'LogisticRegression' has no attribute 'score_samples'"
     with pytest.raises(
             AttributeError,
             match=match,

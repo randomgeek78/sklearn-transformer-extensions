@@ -14,10 +14,15 @@ from sklearn.utils._testing import assert_allclose_dense_sparse
 from sklearn.utils._testing import assert_almost_equal
 
 from sklearn.base import BaseEstimator
+from sklearn.compose import (
+    ColumnTransformer as _ColumnTransformer,
+    make_column_transformer as _make_column_transformer,
+)
 from sklearn_transformer_extensions.compose import (
     ColumnTransformer,
     make_column_transformer,
 )
+from sklearn_transformer_extensions import XyAdapter
 from sklearn.compose import (
     make_column_selector, )
 from sklearn.exceptions import NotFittedError
@@ -78,7 +83,22 @@ class TransRaise(BaseEstimator):
         raise ValueError("specific message")
 
 
-def test_column_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer(ColumnTransformer, Trans):
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
 
     X_res_first1D = np.array([0, 1, 2])
@@ -141,7 +161,22 @@ def test_column_transformer():
     assert len(both.transformers_) == 1
 
 
-def test_column_transformer_dataframe():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_dataframe(ColumnTransformer, Trans):
     pd = pytest.importorskip("pandas")
 
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
@@ -249,6 +284,13 @@ def test_column_transformer_dataframe():
     ct = ColumnTransformer([("trans", TransAssert(), ["first", "second"])])
     ct.fit_transform(X_df)
 
+    ct = ColumnTransformer([("trans", XyAdapter(TransAssert)(), "first")],
+                           remainder="drop")
+    ct.fit_transform(X_df)
+    ct = ColumnTransformer([("trans", XyAdapter(TransAssert)(),
+                             ["first", "second"])])
+    ct.fit_transform(X_df)
+
     # integer column spec + integer column names -> still use positional
     X_df2 = X_df.copy()
     X_df2.columns = [1, 0]
@@ -262,6 +304,28 @@ def test_column_transformer_dataframe():
     assert_array_equal(ct.transformers_[-1][2], [1])
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
+    "TransRaise",
+    [
+        TransRaise,
+        XyAdapter(TransRaise),
+    ],
+)
 @pytest.mark.parametrize("pandas", [True, False], ids=["pandas", "numpy"])
 @pytest.mark.parametrize(
     "column_selection",
@@ -269,7 +333,8 @@ def test_column_transformer_dataframe():
     ids=["list", "bool", "bool_int"],
 )
 @pytest.mark.parametrize("callable_column", [False, True])
-def test_column_transformer_empty_columns(pandas, column_selection,
+def test_column_transformer_empty_columns(ColumnTransformer, Trans, TransRaise,
+                                          pandas, column_selection,
                                           callable_column):
     # test case that ensures that the column transformer does also work when
     # a given transformer doesn't have any columns to work on
@@ -409,7 +474,22 @@ def test_column_transformer_output_indices_df():
                                                ct.output_indices_["remainder"]])
 
 
-def test_column_transformer_sparse_array():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_sparse_array(ColumnTransformer, Trans):
     X_sparse = sparse.eye(3, 2).tocsr()
 
     # no distinction between 1D and 2D
@@ -434,7 +514,30 @@ def test_column_transformer_sparse_array():
             ct.fit(X_sparse).transform(X_sparse), X_res_both)
 
 
-def test_column_transformer_list():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+def test_column_transformer_list(ColumnTransformer, StandardScaler,
+                                 OneHotEncoder):
     X_list = [[1, float("nan"), "a"], [0, 0, "b"]]
     expected_result = np.array([
         [1, float("nan"), 1, 0],
@@ -450,7 +553,30 @@ def test_column_transformer_list():
     assert_array_equal(ct.fit(X_list).transform(X_list), expected_result)
 
 
-def test_column_transformer_sparse_stacking():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
+    "SparseMatrixTrans",
+    [
+        SparseMatrixTrans,
+        XyAdapter(SparseMatrixTrans),
+    ],
+)
+def test_column_transformer_sparse_stacking(ColumnTransformer, Trans,
+                                            SparseMatrixTrans):
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
     col_trans = ColumnTransformer(
         [("trans1", Trans(), [0]), ("trans2", SparseMatrixTrans(), 1)],
@@ -475,7 +601,22 @@ def test_column_transformer_sparse_stacking():
     assert_array_equal(X_trans[:, 1:], np.eye(X_trans.shape[0]))
 
 
-def test_column_transformer_mixed_cols_sparse():
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+def test_column_transformer_mixed_cols_sparse(make_column_transformer,
+                                              OneHotEncoder):
     df = np.array([["a", 1, True], ["b", 2, False]], dtype="O")
 
     ct = make_column_transformer((OneHotEncoder(), [0]),
@@ -497,7 +638,22 @@ def test_column_transformer_mixed_cols_sparse():
         ct.fit_transform(df)
 
 
-def test_column_transformer_sparse_threshold():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+def test_column_transformer_sparse_threshold(ColumnTransformer, OneHotEncoder):
     X_array = np.array([["a", "b"], ["A", "B"]], dtype=object).T
     # above data has sparsity of 4 / 8 = 0.5
 
@@ -549,7 +705,30 @@ def test_column_transformer_sparse_threshold():
         assert not col_trans.sparse_output_
 
 
-def test_column_transformer_error_msg_1D():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+@pytest.mark.parametrize(
+    "TransRaise",
+    [
+        TransRaise,
+        XyAdapter(TransRaise),
+    ],
+)
+def test_column_transformer_error_msg_1D(ColumnTransformer, StandardScaler,
+                                         TransRaise):
     X_array = np.array([[0.0, 1.0, 2.0], [2.0, 4.0, 6.0]]).T
 
     col_trans = ColumnTransformer([("trans", StandardScaler(), 0)])
@@ -566,7 +745,22 @@ def test_column_transformer_error_msg_1D():
             func(X_array)
 
 
-def test_2D_transformer_output():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "TransNo2D",
+    [
+        TransNo2D,
+        XyAdapter(TransNo2D),
+    ],
+)
+def test_2D_transformer_output(ColumnTransformer, TransNo2D):
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
 
     # if one transformer is dropped, test that name is still correct
@@ -580,7 +774,22 @@ def test_2D_transformer_output():
         ct.fit(X_array)
 
 
-def test_2D_transformer_output_pandas():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "TransNo2D",
+    [
+        TransNo2D,
+        XyAdapter(TransNo2D),
+    ],
+)
+def test_2D_transformer_output_pandas(ColumnTransformer, TransNo2D):
     pd = pytest.importorskip("pandas")
 
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
@@ -596,8 +805,24 @@ def test_2D_transformer_output_pandas():
         ct.fit(X_df)
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
 @pytest.mark.parametrize("remainder", ["drop", "passthrough"])
-def test_column_transformer_invalid_columns(remainder):
+def test_column_transformer_invalid_columns(ColumnTransformer, Trans,
+                                            remainder):
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
 
     # general invalid
@@ -630,7 +855,15 @@ def test_column_transformer_invalid_columns(remainder):
         ct.transform(X_array_fewer)
 
 
-def test_column_transformer_invalid_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+def test_column_transformer_invalid_transformer(ColumnTransformer):
 
     class NoTrans(BaseEstimator):
 
@@ -646,8 +879,35 @@ def test_column_transformer_invalid_transformer():
     with pytest.raises(TypeError, match=msg):
         ct.fit(X_array)
 
+    ct = ColumnTransformer([("trans", XyAdapter(NoTrans)(), [0])])
+    msg = "All estimators should implement fit and transform"
+    with pytest.raises(TypeError, match=msg):
+        ct.fit(X_array)
 
-def test_make_column_transformer():
+
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+@pytest.mark.parametrize(
+    "Normalizer",
+    [
+        Normalizer,
+        XyAdapter(Normalizer),
+    ],
+)
+def test_make_column_transformer(make_column_transformer, StandardScaler,
+                                 Normalizer):
     scaler = StandardScaler()
     norm = Normalizer()
     ct = make_column_transformer((scaler, "first"), (norm, ["second"]))
@@ -657,7 +917,21 @@ def test_make_column_transformer():
     assert columns == ("first", ["second"])
 
 
-def test_make_column_transformer_pandas():
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "Normalizer",
+    [
+        Normalizer,
+        XyAdapter(Normalizer),
+    ],
+)
+def test_make_column_transformer_pandas(make_column_transformer, Normalizer):
     pd = pytest.importorskip("pandas")
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
     X_df = pd.DataFrame(X_array, columns=["first", "second"])
@@ -667,7 +941,29 @@ def test_make_column_transformer_pandas():
     assert_almost_equal(ct1.fit_transform(X_df), ct2.fit_transform(X_df))
 
 
-def test_make_column_transformer_kwargs():
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+@pytest.mark.parametrize(
+    "Normalizer",
+    [
+        Normalizer,
+        XyAdapter(Normalizer),
+    ],
+)
+def test_make_column_transformer_kwargs(make_column_transformer, StandardScaler,
+                                        Normalizer):
     scaler = StandardScaler()
     norm = Normalizer()
     ct = make_column_transformer(
@@ -696,7 +992,30 @@ def test_make_column_transformer_kwargs():
         )
 
 
-def test_make_column_transformer_remainder_transformer():
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+@pytest.mark.parametrize(
+    "Normalizer",
+    [
+        Normalizer,
+        XyAdapter(Normalizer),
+    ],
+)
+def test_make_column_transformer_remainder_transformer(make_column_transformer,
+                                                       StandardScaler,
+                                                       Normalizer):
     scaler = StandardScaler()
     norm = Normalizer()
     remainder = StandardScaler()
@@ -705,7 +1024,22 @@ def test_make_column_transformer_remainder_transformer():
     assert ct.remainder == remainder
 
 
-def test_column_transformer_get_set_params():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_get_set_params(ColumnTransformer, StandardScaler):
     ct = ColumnTransformer([("trans1", StandardScaler(), [0]),
                             ("trans2", StandardScaler(), [1])])
 
@@ -751,7 +1085,22 @@ def test_column_transformer_get_set_params():
     assert ct.get_params() == exp
 
 
-def test_column_transformer_named_estimators():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_named_estimators(ColumnTransformer, StandardScaler):
     X_array = np.array([[0.0, 1.0, 2.0], [2.0, 4.0, 6.0]]).T
     ct = ColumnTransformer([
         ("trans1", StandardScaler(), [0]),
@@ -769,7 +1118,22 @@ def test_column_transformer_named_estimators():
     assert ct.named_transformers_.trans1.mean_ == 1.0
 
 
-def test_column_transformer_cloning():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_cloning(ColumnTransformer, StandardScaler):
     X_array = np.array([[0.0, 1.0, 2.0], [2.0, 4.0, 6.0]]).T
 
     ct = ColumnTransformer([("trans", StandardScaler(), [0])])
@@ -784,10 +1148,26 @@ def test_column_transformer_cloning():
 
 
 # TODO: Remove in 1.2 when get_feature_names is removed.
-@pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
 @pytest.mark.parametrize("get_names",
                          ["get_feature_names", "get_feature_names_out"])
-def test_column_transformer_get_feature_names(get_names):
+@pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
+def test_column_transformer_get_feature_names(ColumnTransformer, Trans,
+                                              get_names):
     X_array = np.array([[0.0, 1.0, 2.0], [2.0, 4.0, 6.0]]).T
     ct = ColumnTransformer([("trans", Trans(), [0, 1])])
     # raise correct error when not fitted
@@ -801,6 +1181,21 @@ def test_column_transformer_get_feature_names(get_names):
         getattr(ct, get_names)()
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "DictVectorizer",
+    [
+        DictVectorizer,
+        XyAdapter(DictVectorizer),
+    ],
+)
 @pytest.mark.parametrize(
     "X, keys",
     [
@@ -839,7 +1234,8 @@ def test_column_transformer_get_feature_names(get_names):
 )
 # TODO: Remove in 1.2 when get_feature_names is removed.
 @pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
-def test_column_transformer_get_feature_names_pipeline(X, keys):
+def test_column_transformer_get_feature_names_pipeline(ColumnTransformer,
+                                                       DictVectorizer, X, keys):
     ct = ColumnTransformer([("col" + str(i), DictVectorizer(), i)
                             for i in range(2)])
     ct.fit(X)
@@ -883,9 +1279,25 @@ def test_column_transformer_get_feature_names_pipeline(X, keys):
     assert ct.get_feature_names() == ["x1", "x0"]
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "DictVectorizer",
+    [
+        DictVectorizer,
+        XyAdapter(DictVectorizer),
+    ],
+)
 # TODO: Remove in 1.2 when get_feature_names is removed.
 @pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
-def test_column_transformer_get_feature_names_dataframe():
+def test_column_transformer_get_feature_names_dataframe(ColumnTransformer,
+                                                        DictVectorizer):
     # passthough transformer with a dataframe
     pd = pytest.importorskip("pandas")
     X = np.array([[{
@@ -942,7 +1354,22 @@ def test_column_transformer_get_feature_names_dataframe():
     assert ct.get_feature_names() == ["col1", "col0"]
 
 
-def test_column_transformer_special_strings():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_special_strings(ColumnTransformer, Trans):
 
     # one 'drop' -> ignore
     X_array = np.array([[0.0, 1.0, 2.0], [2.0, 4.0, 6.0]]).T
@@ -981,7 +1408,22 @@ def test_column_transformer_special_strings():
             ct.fit(X_array)
 
 
-def test_column_transformer_remainder():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_remainder(ColumnTransformer, Trans):
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
 
     X_res_first = np.array([0, 1, 2]).reshape(-1, 1)
@@ -1039,10 +1481,25 @@ def test_column_transformer_remainder():
 
 
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
     "key",
     [[0], np.array([0]),
      slice(0, 1), np.array([True, False])])
-def test_column_transformer_remainder_numpy(key):
+def test_column_transformer_remainder_numpy(ColumnTransformer, Trans, key):
     # test different ways that columns are specified with passthrough
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
     X_res_both = X_array
@@ -1057,6 +1514,21 @@ def test_column_transformer_remainder_numpy(key):
 
 
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
     "key",
     [
         [0],
@@ -1070,7 +1542,7 @@ def test_column_transformer_remainder_numpy(key):
         slice("first", "first"),
     ],
 )
-def test_column_transformer_remainder_pandas(key):
+def test_column_transformer_remainder_pandas(ColumnTransformer, Trans, key):
     # test different ways that columns are specified with passthrough
     pd = pytest.importorskip("pandas")
     if isinstance(key, str) and key == "pd-index":
@@ -1090,11 +1562,27 @@ def test_column_transformer_remainder_pandas(key):
 
 
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
     "key",
     [[0], np.array([0]),
      slice(0, 1),
      np.array([True, False, False])])
-def test_column_transformer_remainder_transformer(key):
+def test_column_transformer_remainder_transformer(ColumnTransformer, Trans,
+                                                  key):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).T
     X_res_both = X_array.copy()
 
@@ -1111,7 +1599,23 @@ def test_column_transformer_remainder_transformer(key):
     assert_array_equal(ct.transformers_[-1][2], [1, 2])
 
 
-def test_column_transformer_no_remaining_remainder_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_no_remaining_remainder_transformer(
+        ColumnTransformer, Trans):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).T
 
     ct = ColumnTransformer([("trans1", Trans(), [0, 1, 2])],
@@ -1123,7 +1627,23 @@ def test_column_transformer_no_remaining_remainder_transformer():
     assert ct.transformers_[-1][0] != "remainder"
 
 
-def test_column_transformer_drops_all_remainder_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_drops_all_remainder_transformer(
+        ColumnTransformer, Trans):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).T
 
     # columns are doubled when remainder = DoubleTrans
@@ -1139,7 +1659,30 @@ def test_column_transformer_drops_all_remainder_transformer():
     assert_array_equal(ct.transformers_[-1][2], [1, 2])
 
 
-def test_column_transformer_sparse_remainder_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+@pytest.mark.parametrize(
+    "SparseMatrixTrans",
+    [
+        SparseMatrixTrans,
+        XyAdapter(SparseMatrixTrans),
+    ],
+)
+def test_column_transformer_sparse_remainder_transformer(
+        ColumnTransformer, Trans, SparseMatrixTrans):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).T
 
     ct = ColumnTransformer([("trans1", Trans(), [0])],
@@ -1159,7 +1702,23 @@ def test_column_transformer_sparse_remainder_transformer():
     assert_array_equal(ct.transformers_[-1][2], [1, 2])
 
 
-def test_column_transformer_drop_all_sparse_remainder_transformer():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "SparseMatrixTrans",
+    [
+        SparseMatrixTrans,
+        XyAdapter(SparseMatrixTrans),
+    ],
+)
+def test_column_transformer_drop_all_sparse_remainder_transformer(
+        ColumnTransformer, SparseMatrixTrans):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).T
     ct = ColumnTransformer([("trans1", "drop", [0])],
                            remainder=SparseMatrixTrans(), sparse_threshold=0.8)
@@ -1176,7 +1735,23 @@ def test_column_transformer_drop_all_sparse_remainder_transformer():
     assert_array_equal(ct.transformers_[-1][2], [1, 2])
 
 
-def test_column_transformer_get_set_params_with_remainder():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_get_set_params_with_remainder(
+        ColumnTransformer, StandardScaler):
     ct = ColumnTransformer([("trans1", StandardScaler(), [0])],
                            remainder=StandardScaler())
 
@@ -1219,7 +1794,22 @@ def test_column_transformer_get_set_params_with_remainder():
     assert ct.get_params() == exp
 
 
-def test_column_transformer_no_estimators():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_no_estimators(ColumnTransformer, StandardScaler):
     X_array = np.array([[0, 1, 2], [2, 4, 6], [8, 6, 4]]).astype("float").T
     ct = ColumnTransformer([], remainder=StandardScaler())
 
@@ -1293,6 +1883,127 @@ def test_column_transformer_no_estimators():
             ColumnTransformer([("trans1", Trans(), [0])], remainder="drop"),
             r"\[ColumnTransformer\].*\(1 of 1\) Processing trans1.* total=.*\n$",
         ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", Trans(), [0]), ("trans2", Trans(), [1])],
+                remainder=DoubleTrans(),
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", Trans(), [0]), ("trans2", Trans(), [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", Trans(), [0]), ("trans2", "drop", [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", Trans(), [0]), ("trans2", "passthrough", [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", Trans(), [0])],
+                                         remainder="passthrough"),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", Trans(), [0]),
+                                          ("trans2", Trans(), [1])],
+                                         remainder="drop"),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing trans2.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", Trans(), [0])],
+                                         remainder="drop"),
+            r"\[ColumnTransformer\].*\(1 of 1\) Processing trans1.* total=.*\n$",
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", XyAdapter(Trans)(), [0]),
+                 ("trans2", XyAdapter(Trans)(), [1])],
+                remainder=DoubleTrans(),
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", XyAdapter(Trans)(), [0]),
+                 ("trans2", XyAdapter(Trans)(), [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", XyAdapter(Trans)(), [0]), ("trans2", "drop", [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)(
+                [("trans1", XyAdapter(Trans)(), [0]),
+                 ("trans2", "passthrough", [1])],
+                remainder="passthrough",
+            ),
+            (r"\[ColumnTransformer\].*\(1 of 3\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 3\) Processing trans2.* total=.*\n"
+             r"\[ColumnTransformer\].*\(3 of 3\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", XyAdapter(Trans)(), [0])],
+                                         remainder="passthrough"),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing remainder.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", XyAdapter(Trans)(), [0]),
+                                          ("trans2", XyAdapter(Trans)(), [1])],
+                                         remainder="drop"),
+            (r"\[ColumnTransformer\].*\(1 of 2\) Processing trans1.* total=.*\n"
+             r"\[ColumnTransformer\].*\(2 of 2\) Processing trans2.* total=.*\n$"
+             ),
+        ),
+        (
+            XyAdapter(ColumnTransformer)([("trans1", XyAdapter(Trans)(), [0])],
+                                         remainder="drop"),
+            r"\[ColumnTransformer\].*\(1 of 1\) Processing trans1.* total=.*\n$",
+        ),
     ],
 )
 @pytest.mark.parametrize("method", ["fit", "fit_transform"])
@@ -1309,12 +2020,35 @@ def test_column_transformer_verbose(est, pattern, method, capsys):
     assert re.match(pattern, capsys.readouterr()[0])
 
 
-def test_column_transformer_no_estimators_set_params():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+def test_column_transformer_no_estimators_set_params(ColumnTransformer):
     ct = ColumnTransformer([]).set_params(n_jobs=2)
     assert ct.n_jobs == 2
 
 
-def test_column_transformer_callable_specifier():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_callable_specifier(ColumnTransformer, Trans):
     # assert that function gets the full array
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
     X_res_first = np.array([[0, 1, 2]]).T
@@ -1330,7 +2064,23 @@ def test_column_transformer_callable_specifier():
     assert ct.transformers_[0][2] == [0]
 
 
-def test_column_transformer_callable_specifier_dataframe():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_column_transformer_callable_specifier_dataframe(
+        ColumnTransformer, Trans):
     # assert that function gets the full dataframe
     pd = pytest.importorskip("pandas")
     X_array = np.array([[0, 1, 2], [2, 4, 6]]).T
@@ -1350,7 +2100,23 @@ def test_column_transformer_callable_specifier_dataframe():
     assert ct.transformers_[0][2] == ["first"]
 
 
-def test_column_transformer_negative_column_indexes():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+def test_column_transformer_negative_column_indexes(ColumnTransformer,
+                                                    OneHotEncoder):
     X = np.random.randn(2, 2)
     X_categories = np.array([[1], [2]])
     X = np.concatenate([X, X_categories], axis=1)
@@ -1362,8 +2128,24 @@ def test_column_transformer_negative_column_indexes():
     assert_array_equal(tf_1.fit_transform(X), tf_2.fit_transform(X))
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "FunctionTransformer",
+    [
+        FunctionTransformer,
+        XyAdapter(FunctionTransformer),
+    ],
+)
 @pytest.mark.parametrize("array_type", [np.asarray, sparse.csr_matrix])
-def test_column_transformer_mask_indexing(array_type):
+def test_column_transformer_mask_indexing(ColumnTransformer,
+                                          FunctionTransformer, array_type):
     # Regression test for #14510
     # Boolean array-like does not behave as boolean array with NumPy < 1.12
     # and sparse matrices as well
@@ -1375,7 +2157,22 @@ def test_column_transformer_mask_indexing(array_type):
     assert X_trans.shape == (3, 2)
 
 
-def test_n_features_in():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "DoubleTrans",
+    [
+        DoubleTrans,
+        XyAdapter(DoubleTrans),
+    ],
+)
+def test_n_features_in(ColumnTransformer, DoubleTrans):
     # make sure n_features_in is what is passed as input to the column
     # transformer.
 
@@ -1424,7 +2221,30 @@ def test_make_column_selector_with_select_dtypes(cols, pattern, include,
     assert_array_equal(selector(X_df), cols)
 
 
-def test_column_transformer_with_make_column_selector():
+@pytest.mark.parametrize(
+    "make_column_transformer",
+    [
+        _make_column_transformer,
+        make_column_transformer,
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+@pytest.mark.parametrize(
+    "StandardScaler",
+    [
+        StandardScaler,
+        XyAdapter(StandardScaler),
+    ],
+)
+def test_column_transformer_with_make_column_selector(make_column_transformer,
+                                                      OneHotEncoder,
+                                                      StandardScaler):
     # Functional test for column transformer + column selector
     pd = pytest.importorskip("pandas")
     X_df = pd.DataFrame(
@@ -1484,6 +2304,21 @@ def test_make_column_selector_pickle():
 # TODO: Remove in 1.2 when get_feature_names is removed.
 @pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+@pytest.mark.parametrize(
     "empty_col",
     [[], np.array([], dtype=int), lambda x: []],
     ids=["list", "array", "callable"],
@@ -1496,7 +2331,8 @@ def test_make_column_selector_pickle():
                                    ]),
     ],
 )
-def test_feature_names_empty_columns(empty_col, get_names, expected_names):
+def test_feature_names_empty_columns(ColumnTransformer, OneHotEncoder,
+                                     empty_col, get_names, expected_names):
     pd = pytest.importorskip("pandas")
 
     df = pd.DataFrame({"col1": ["a", "a", "b"], "col2": ["z", "z", "z"]})
@@ -1512,6 +2348,21 @@ def test_feature_names_empty_columns(empty_col, get_names, expected_names):
 
 
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+@pytest.mark.parametrize(
     "selector",
     [
         [1],
@@ -1522,7 +2373,7 @@ def test_feature_names_empty_columns(empty_col, get_names, expected_names):
         lambda x: [False, True],
     ],
 )
-def test_feature_names_out_pandas(selector):
+def test_feature_names_out_pandas(ColumnTransformer, OneHotEncoder, selector):
     """Checks name when selecting only the second column"""
     pd = pytest.importorskip("pandas")
     df = pd.DataFrame({"col1": ["a", "a", "b"], "col2": ["z", "z", "z"]})
@@ -1533,8 +2384,24 @@ def test_feature_names_out_pandas(selector):
 
 
 @pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+@pytest.mark.parametrize(
     "selector", [[1], lambda x: [1], [False, True], lambda x: [False, True]])
-def test_feature_names_out_non_pandas(selector):
+def test_feature_names_out_non_pandas(ColumnTransformer, OneHotEncoder,
+                                      selector):
     """Checks name when selecting the second column with numpy array"""
     X = [["a", "z"], ["a", "z"], ["b", "z"]]
     ct = ColumnTransformer([("ohe", OneHotEncoder(), selector)])
@@ -1543,8 +2410,26 @@ def test_feature_names_out_non_pandas(selector):
     assert_array_equal(ct.get_feature_names_out(), ["ohe__x1_z"])
 
 
-@pytest.mark.parametrize("remainder", ["passthrough", StandardScaler()])
-def test_sk_visual_block_remainder(remainder):
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+@pytest.mark.parametrize(
+    "remainder", ["passthrough",
+                  StandardScaler(),
+                  XyAdapter(StandardScaler)()])
+def test_sk_visual_block_remainder(ColumnTransformer, OneHotEncoder, remainder):
     # remainder='passthrough' or an estimator will be shown in repr_html
     ohe = OneHotEncoder()
     ct = ColumnTransformer(transformers=[("ohe", ohe, ["col1", "col2"])],
@@ -1555,7 +2440,22 @@ def test_sk_visual_block_remainder(remainder):
     assert visual_block.estimators == (ohe, remainder)
 
 
-def test_sk_visual_block_remainder_drop():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
+def test_sk_visual_block_remainder_drop(ColumnTransformer, OneHotEncoder):
     # remainder='drop' is not shown in repr_html
     ohe = OneHotEncoder()
     ct = ColumnTransformer(transformers=[("ohe", ohe, ["col1", "col2"])])
@@ -1565,8 +2465,24 @@ def test_sk_visual_block_remainder_drop():
     assert visual_block.estimators == (ohe, )
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
 @pytest.mark.parametrize("remainder", ["passthrough", StandardScaler()])
-def test_sk_visual_block_remainder_fitted_pandas(remainder):
+def test_sk_visual_block_remainder_fitted_pandas(ColumnTransformer,
+                                                 OneHotEncoder, remainder):
     # Remainder shows the columns after fitting
     pd = pytest.importorskip("pandas")
     ohe = OneHotEncoder()
@@ -1585,8 +2501,19 @@ def test_sk_visual_block_remainder_fitted_pandas(remainder):
     assert visual_block.estimators == (ohe, remainder)
 
 
-@pytest.mark.parametrize("remainder", ["passthrough", StandardScaler()])
-def test_sk_visual_block_remainder_fitted_numpy(remainder):
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "remainder", ["passthrough",
+                  StandardScaler(),
+                  XyAdapter(StandardScaler)()])
+def test_sk_visual_block_remainder_fitted_numpy(ColumnTransformer, remainder):
     # Remainder shows the indices after fitting
     X = np.array([[1, 2, 3], [4, 5, 6]], dtype=float)
     scaler = StandardScaler()
@@ -1598,9 +2525,26 @@ def test_sk_visual_block_remainder_fitted_numpy(remainder):
     assert visual_block.name_details == ([0, 2], [1])
     assert visual_block.estimators == (scaler, remainder)
 
+    scaler = XyAdapter(StandardScaler)()
+    ct = ColumnTransformer(transformers=[("scale", scaler, [0, 2])],
+                           remainder=remainder)
+    ct.fit(X)
+    visual_block = ct._sk_visual_block_()
+    assert visual_block.names == ("scale", "remainder")
+    assert visual_block.name_details == ([0, 2], [1])
+    assert visual_block.estimators == (scaler, remainder)
+
 
 # TODO: Remove in 1.2 when get_feature_names is removed
-def test_column_transformers_get_feature_names_deprecated():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+def test_column_transformers_get_feature_names_deprecated(ColumnTransformer):
     """Check that get_feature_names is deprecated"""
     X = np.array([[0, 1], [2, 4]])
     ct = ColumnTransformer([("trans", "passthrough", [0, 1])])
@@ -1611,10 +2555,26 @@ def test_column_transformers_get_feature_names_deprecated():
         ct.get_feature_names()
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
 @pytest.mark.parametrize("explicit_colname", ["first", "second", 0, 1])
-@pytest.mark.parametrize("remainder", [Trans(), "passthrough", "drop"])
+@pytest.mark.parametrize(
+    "remainder", [Trans(), XyAdapter(Trans)(), "passthrough", "drop"])
 def test_column_transformer_reordered_column_names_remainder(
-        explicit_colname, remainder):
+        ColumnTransformer, Trans, explicit_colname, remainder):
     """Test the interaction between remainder and column transformer"""
     pd = pytest.importorskip("pandas")
 
@@ -1649,7 +2609,23 @@ def test_column_transformer_reordered_column_names_remainder(
             tf.transform(X_array)
 
 
-def test_feature_name_validation_missing_columns_drop_passthough():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_feature_name_validation_missing_columns_drop_passthough(
+        ColumnTransformer, Trans):
     """Test the interaction between {'drop', 'passthrough'} and
     missing column names."""
     pd = pytest.importorskip("pandas")
@@ -1683,10 +2659,26 @@ def test_feature_name_validation_missing_columns_drop_passthough():
     assert_allclose(df_dropped_trans, df_fit_trans)
 
 
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "OneHotEncoder",
+    [
+        OneHotEncoder,
+        XyAdapter(OneHotEncoder),
+    ],
+)
 # TODO: Remove in 1.2 when get_feature_names is removed.
 @pytest.mark.filterwarnings("ignore::FutureWarning:sklearn")
 @pytest.mark.parametrize("selector", [[], [False, False]])
-def test_get_feature_names_empty_selection(selector):
+def test_get_feature_names_empty_selection(ColumnTransformer, OneHotEncoder,
+                                           selector):
     """Test that get_feature_names is only called for transformers that
     were selected. Non-regression test for #19550.
     """
@@ -1695,7 +2687,22 @@ def test_get_feature_names_empty_selection(selector):
     assert ct.get_feature_names() == []
 
 
-def test_feature_names_in_():
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
+@pytest.mark.parametrize(
+    "Trans",
+    [
+        Trans,
+        XyAdapter(Trans),
+    ],
+)
+def test_feature_names_in_(ColumnTransformer, Trans):
     """Feature names are stored in column transformer.
 
     Column transformer deliberately does not check for column name consistency.
@@ -1715,7 +2722,6 @@ def test_feature_names_in_():
     assert isinstance(ct.feature_names_in_, np.ndarray)
     assert ct.feature_names_in_.dtype == object
 
-
 class TransWithNames(Trans):
 
     def __init__(self, feature_names_out=None):
@@ -1727,6 +2733,24 @@ class TransWithNames(Trans):
         return input_features
 
 
+class XyTransWithNames(XyAdapter(Trans)):
+
+    def __init__(self, feature_names_out=None):
+        self.feature_names_out = feature_names_out
+
+    def get_feature_names_out(self, input_features=None):
+        if self.feature_names_out is not None:
+            return np.asarray(self.feature_names_out, dtype=object)
+        return input_features
+
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
 @pytest.mark.parametrize(
     "transformers, remainder, expected_names",
     [
@@ -1797,9 +2821,145 @@ class TransWithNames(Trans):
             "drop",
             [],
         ),
+
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "passthrough",
+            [
+                "bycol1__d", "bycol1__c", "bycol2__d", "remainder__a",
+                "remainder__b"
+            ],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["bycol1__d", "bycol1__c", "bycol2__d"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["b"]),
+                ("bycol2", "drop", ["d"]),
+            ],
+            "passthrough",
+            ["bycol1__b", "remainder__a", "remainder__c"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["pca1", "pca2"]), ["a", "b", "d"]),
+            ],
+            "passthrough",
+            ["bycol1__pca1", "bycol1__pca2", "remainder__c"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a", "b"]), ["d"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "drop",
+            ["bycol1__a", "bycol1__b", "bycol2__b"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+                ("bycol2", XyTransWithNames([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+            ],
+            "passthrough",
+            [
+                "bycol1__pca0",
+                "bycol1__pca1",
+                "bycol2__pca0",
+                "bycol2__pca1",
+                "remainder__a",
+                "remainder__c",
+                "remainder__d",
+            ],
+        ),
+        (
+            [
+                ("bycol1", "drop", ["d"]),
+            ],
+            "drop",
+            [],
+        ),
+
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "passthrough",
+            [
+                "bycol1__d", "bycol1__c", "bycol2__d", "remainder__a",
+                "remainder__b"
+            ],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["bycol1__d", "bycol1__c", "bycol2__d"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["b"]),
+                ("bycol2", "drop", ["d"]),
+            ],
+            "passthrough",
+            ["bycol1__b", "remainder__a", "remainder__c"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["pca1", "pca2"]), ["a", "b", "d"]),
+            ],
+            "passthrough",
+            ["bycol1__pca1", "bycol1__pca2", "remainder__c"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a", "b"]), ["d"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "drop",
+            ["bycol1__a", "bycol1__b", "bycol2__b"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+                ("bycol2", XyAdapter(XyTransWithNames)([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+            ],
+            "passthrough",
+            [
+                "bycol1__pca0",
+                "bycol1__pca1",
+                "bycol2__pca0",
+                "bycol2__pca1",
+                "remainder__a",
+                "remainder__c",
+                "remainder__d",
+            ],
+        ),
+        (
+            [
+                ("bycol1", "drop", ["d"]),
+            ],
+            "drop",
+            [],
+        ),
     ],
 )
-def test_verbose_feature_names_out_true(transformers, remainder,
+def test_verbose_feature_names_out_true(ColumnTransformer, transformers, remainder,
                                         expected_names):
     """Check feature_names_out for verbose_feature_names_out=True (default)"""
     pd = pytest.importorskip("pandas")
@@ -1815,7 +2975,14 @@ def test_verbose_feature_names_out_true(transformers, remainder,
     assert names.dtype == object
     assert_array_equal(names, expected_names)
 
-
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
 @pytest.mark.parametrize(
     "transformers, remainder, expected_names",
     [
@@ -1875,9 +3042,123 @@ def test_verbose_feature_names_out_true(transformers, remainder,
             "drop",
             [],
         ),
+
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["d", "c"]),
+                ("bycol2", "passthrough", ["a"]),
+            ],
+            "passthrough",
+            ["d", "c", "a", "b"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a"]), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["a", "d"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["b"]),
+                ("bycol2", "drop", ["d"]),
+            ],
+            "passthrough",
+            ["b", "a", "c"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["pca1", "pca2"]), ["a", "b", "d"]),
+            ],
+            "passthrough",
+            ["pca1", "pca2", "c"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a", "c"]), ["d"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["a", "c", "d"],
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+                ("bycol2", XyTransWithNames([f"kpca{i}"
+                                           for i in range(2)]), ["b"]),
+            ],
+            "passthrough",
+            ["pca0", "pca1", "kpca0", "kpca1", "a", "c", "d"],
+        ),
+        (
+            [
+                ("bycol1", "drop", ["d"]),
+            ],
+            "drop",
+            [],
+        ),
+
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["d", "c"]),
+                ("bycol2", "passthrough", ["a"]),
+            ],
+            "passthrough",
+            ["d", "c", "a", "b"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a"]), ["d", "c"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["a", "d"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["b"]),
+                ("bycol2", "drop", ["d"]),
+            ],
+            "passthrough",
+            ["b", "a", "c"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["pca1", "pca2"]), ["a", "b", "d"]),
+            ],
+            "passthrough",
+            ["pca1", "pca2", "c"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a", "c"]), ["d"]),
+                ("bycol2", "passthrough", ["d"]),
+            ],
+            "drop",
+            ["a", "c", "d"],
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)([f"pca{i}"
+                                           for i in range(2)]), ["b"]),
+                ("bycol2", XyAdapter(XyTransWithNames)([f"kpca{i}"
+                                           for i in range(2)]), ["b"]),
+            ],
+            "passthrough",
+            ["pca0", "pca1", "kpca0", "kpca1", "a", "c", "d"],
+        ),
+        (
+            [
+                ("bycol1", "drop", ["d"]),
+            ],
+            "drop",
+            [],
+        ),
     ],
 )
-def test_verbose_feature_names_out_false(transformers, remainder,
+def test_verbose_feature_names_out_false(ColumnTransformer, transformers, remainder,
                                          expected_names):
     """Check feature_names_out for verbose_feature_names_out=False"""
     pd = pytest.importorskip("pandas")
@@ -1894,7 +3175,14 @@ def test_verbose_feature_names_out_false(transformers, remainder,
     assert names.dtype == object
     assert_array_equal(names, expected_names)
 
-
+@pytest.mark.parametrize(
+    "ColumnTransformer",
+    [
+        _ColumnTransformer,
+        ColumnTransformer,
+        XyAdapter(ColumnTransformer),
+    ],
+)
 @pytest.mark.parametrize(
     "transformers, remainder, colliding_columns",
     [
@@ -1966,9 +3254,147 @@ def test_verbose_feature_names_out_false(transformers, remainder,
             "passthrough",
             "['pca0', 'pca1', 'pca2', 'pca3', 'pca4', ...]",
         ),
+
+        (
+            [
+                ("bycol1", XyTransWithNames(), ["b"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "drop",
+            "['b']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["c", "d"]), ["c"]),
+                ("bycol2", "passthrough", ["c"]),
+            ],
+            "drop",
+            "['c']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a"]), ["b"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a"]), ["b"]),
+                ("bycol2", "drop", ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["c", "b"]), ["b"]),
+                ("bycol2", "passthrough", ["c", "b"]),
+            ],
+            "drop",
+            "['b', 'c']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a"]), ["b"]),
+                ("bycol2", "passthrough", ["a"]),
+                ("bycol3", XyTransWithNames(["a"]), ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames(["a", "b"]), ["b"]),
+                ("bycol2", "passthrough", ["a"]),
+                ("bycol3", XyTransWithNames(["b"]), ["c"]),
+            ],
+            "passthrough",
+            "['a', 'b']",
+        ),
+        (
+            [
+                ("bycol1", XyTransWithNames([f"pca{i}"
+                                           for i in range(6)]), ["b"]),
+                ("bycol2", XyTransWithNames([f"pca{i}"
+                                           for i in range(6)]), ["b"]),
+            ],
+            "passthrough",
+            "['pca0', 'pca1', 'pca2', 'pca3', 'pca4', ...]",
+        ),
+
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(), ["b"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "drop",
+            "['b']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["c", "d"]), ["c"]),
+                ("bycol2", "passthrough", ["c"]),
+            ],
+            "drop",
+            "['c']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a"]), ["b"]),
+                ("bycol2", "passthrough", ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a"]), ["b"]),
+                ("bycol2", "drop", ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["c", "b"]), ["b"]),
+                ("bycol2", "passthrough", ["c", "b"]),
+            ],
+            "drop",
+            "['b', 'c']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a"]), ["b"]),
+                ("bycol2", "passthrough", ["a"]),
+                ("bycol3", XyAdapter(XyTransWithNames)(["a"]), ["b"]),
+            ],
+            "passthrough",
+            "['a']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)(["a", "b"]), ["b"]),
+                ("bycol2", "passthrough", ["a"]),
+                ("bycol3", XyAdapter(XyTransWithNames)(["b"]), ["c"]),
+            ],
+            "passthrough",
+            "['a', 'b']",
+        ),
+        (
+            [
+                ("bycol1", XyAdapter(XyTransWithNames)([f"pca{i}"
+                                           for i in range(6)]), ["b"]),
+                ("bycol2", XyAdapter(XyTransWithNames)([f"pca{i}"
+                                           for i in range(6)]), ["b"]),
+            ],
+            "passthrough",
+            "['pca0', 'pca1', 'pca2', 'pca3', 'pca4', ...]",
+        ),
     ],
 )
-def test_verbose_feature_names_out_false_errors(transformers, remainder,
+def test_verbose_feature_names_out_false_errors(ColumnTransformer, transformers, remainder,
                                                 colliding_columns):
     """Check feature_names_out for verbose_feature_names_out=False"""
 
