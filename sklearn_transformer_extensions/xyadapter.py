@@ -1,4 +1,5 @@
 import sys as _sys
+import warnings
 from functools import partial
 from scipy import sparse
 from sklearn.utils import _safe_indexing
@@ -9,12 +10,14 @@ from sklearn.utils.validation import (
 )
 import numpy as np
 from typing import Dict, Any
+from . import __version__
 
 try:
     import pandas as pd
 except:
     pass
 import copy
+
 
 class XyData:
     """XyData object holds both the features and labels in the same
@@ -101,7 +104,37 @@ class XyAdapterStub(object):
 
 
 class XyAdapterBase:
-    pass
+
+    def __getstate__(self):
+        try:
+            state = super().__getstate__()
+        except AttributeError:
+            state = self.__dict__.copy()
+
+        if type(self).__module__.startswith("sklearn_transformer_extensions."):
+            return dict(state.items(), _xyadapter_version=__version__)
+        else:
+            return state
+
+    def __setstate__(self, state):
+        if type(self).__module__.startswith("sklearn_transformer_extensions."):
+            pickle_version = state.pop("_xyadapter_version", "pre-0.18")
+            if pickle_version != __version__:
+                warnings.warn(
+                    "Trying to unpickle estimator {0} from version {1} when "
+                    "using version {2}. This might lead to breaking code or "
+                    "invalid results. Use at your own risk. "
+                    "For more info please refer to:\n"
+                    "https://scikit-learn.org/stable/modules/model_persistence"
+                    ".html#security-maintainability-limitations".format(
+                        self.__class__.__name__, pickle_version, __version__),
+                    UserWarning,
+                )
+
+        try:
+            super().__setstate__(state)
+        except AttributeError:
+            self.__dict__.update(state)
 
 
 def _check_method(method):
@@ -174,6 +207,7 @@ def XyAdapterFactory(klass):
     # https://stackoverflow.com/questions/4647566/pickle-a-dynamically-parameterized-sub-class
     class XyAdapter(klass, XyAdapterBase):
 
+        @available_if(_check_method("get_params"))
         def get_params(self, deep: bool = True) -> Dict[str, Any]:
             # from xgboost/get_params
             params = super().get_params(deep)
@@ -209,7 +243,8 @@ def XyAdapterFactory(klass):
                             Xt = np.atleast_2d(X)
                         n_features = _num_features(Xt)
                         feature_names_out = np.asarray(
-                            [f"col{i}" for i in range(n_features)], dtype=object)
+                            [f"col{i}" for i in range(n_features)],
+                            dtype=object)
 
                     if sparse.issparse(X):
                         X = pd.DataFrame.sparse.from_spmatrix(
@@ -325,7 +360,7 @@ def XyAdapterFactory(klass):
                               join_y=False, reset=False)
 
         def __reduce__(self):
-            return (XyAdapterStub(), (klass, ), self.__dict__)
+            return (XyAdapterStub(), (klass, ), self.__getstate__())
 
     # https://hg.python.org/cpython/file/b14308524cff/Lib/collections/__init__.py#l378
     # try:
