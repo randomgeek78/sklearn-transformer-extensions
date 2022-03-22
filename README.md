@@ -178,8 +178,8 @@ transformers so it an XyData object, the adapted object also outputs a pandas
 introduced `get_feature_names_out` interface in order to get output
 `DataFrame`'s column names.
 
-The package also provides drop-in replacements to `ColumnTransformer` and
-`FunctionTransformer` provide additional functionality. Please refer to their
-documentation for more details. The package's core functionality has been
-extensively tested by extending scikit-learn's tests for `Pipeline`,
-`ColumnTransformer` and `FunctionTransformer`.
+Please checkout the source documentation for more details on `ColumnTransformer`, `FunctionTransformer` and other extensions.
+
+The package's core functionality has been extensively tested by extending
+scikit-learn's tests for `Pipeline`, `ColumnTransformer` and
+`FunctionTransformer`.
