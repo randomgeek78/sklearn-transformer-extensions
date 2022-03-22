@@ -31,8 +31,49 @@ class Pipeline(_Pipeline):
 
     Examples
     --------
+    >>> from sklearn.feature_extraction.text import CountVectorizer
+    >>> from sklearn.linear_model import LogisticRegression
+    >>> from sklearn_transformer_extensions import XyAdapter, XyData
+    >>> from sklearn_transformer_extensions.pipeline import (
+    ...     Pipeline as PipelineXy)
+    >>> from sklearn.pipeline import Pipeline
 
+    >>> JUNK_FOOD_DOCS = (
+    ...     "the pizza pizza beer copyright",
+    ...     "the pizza burger beer copyright",
+    ...     "the the pizza beer beer copyright",
+    ...     "the burger beer beer copyright",
+    ...     "the coke burger coke copyright",
+    ...     "the coke burger burger",
+    ... )
 
+    >>> X = JUNK_FOOD_DOCS
+    >>> y = ["pizza" in x for x in JUNK_FOOD_DOCS]
+    >>> Xy = XyData(X, y)
+    >>> pipe = Pipeline(steps=[
+    ...     ("vect", XyAdapter(CountVectorizer)()),
+    ...     ("clf", XyAdapter(LogisticRegression)()),
+    ... ])
+    >>> pipe.fit(Xy)
+    Pipeline(steps=[('vect', CountVectorizer()), ('clf', LogisticRegression())])
+    >>> pipe.score(Xy)
+    1.0
+    >>> pipe[0].get_feature_names_out()
+    array(['beer', 'burger', 'coke', 'copyright', 'pizza', 'the'],
+          dtype=object)
+
+    This can also be accomplished using the extended Pipeline class implemented
+    in this module. In this case, individual steps don't need to be wrapped
+    with XyAdapter.
+    >>> pipe = PipelineXy(steps=[
+    ...     ("vect", CountVectorizer()),
+    ...     ("clf", LogisticRegression()),
+    ... ])
+    >>> pipe.fit(Xy)
+    Pipeline(steps=[('vect', CountVectorizer()), ('clf', LogisticRegression())])
+    >>> pipe[0].get_feature_names_out()
+    array(['beer', 'burger', 'coke', 'copyright', 'pizza', 'the'],
+          dtype=object)
 
     """
 
