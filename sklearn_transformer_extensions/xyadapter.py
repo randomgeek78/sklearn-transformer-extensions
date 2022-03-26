@@ -2,7 +2,6 @@ import sys as _sys
 import warnings
 from functools import partial
 from scipy import sparse
-from sklearn.utils import _safe_indexing
 from sklearn.utils.metaestimators import available_if
 from sklearn.utils.validation import (
     _make_indexable,
@@ -18,81 +17,7 @@ except:
     pass
 import copy
 
-
-class XyData:
-    """XyData object holds both the features and labels in the same
-    data-structure. It implements a iterator interface as well as an indexing
-    interface. Scikit-learn treats it as a numpy array since it provides a
-    shape attribute.
-
-    Parameters
-    ----------
-    X, y: An iterable, pandas dataframe, numpy array
-        Both X and y need to be the same length
-
-    Attributes
-    ----------
-    X, y
-
-    Examples
-    --------
-    >>> from sklearn_transformer_extensions import XyData
-    >>> import numpy as np
-    >>> X = np.c_[1, 2, 3].T
-    >>> y = np.r_[2, 4, 6]
-    >>> Xy = XyData(X, y)
-    >>> print(Xy)
-    XyData(X=numpy(shape=(3, 1)), y=numpy(shape=(3,)))
-    >>> print(Xy.X.shape, Xy.y.shape)
-    (3, 1) (3,)
-    >>> X_, y_ = Xy
-    >>> print(X_.shape, y_.shape)
-    (3, 1) (3,)
-    >>> Xy_subset = Xy[:2]
-    >>> print(Xy_subset)
-    XyData(X=numpy(shape=(2, 1)), y=numpy(shape=(2,)))
-    >>> print(Xy_subset.X, Xy_subset.y)
-    [[1]
-     [2]] [2 4]
-    """
-
-    def __init__(self, X, y):
-
-        self.X, self.y = _make_indexable((X, y))
-
-    def __getitem__(self, ind):
-
-        X = _safe_indexing(self.X, ind)
-        y = _safe_indexing(self.y, ind)
-
-        return XyData(X, y)
-
-    def __len__(self):
-
-        return len(self.X)
-
-    def __iter__(self):
-
-        return iter((self.X, self.y))
-
-    def __repr__(self):
-
-        tx = 'numpy'
-        if hasattr(self.X, "iloc"):
-            tx = 'pandas'
-        sx = self.X.shape
-
-        ty = 'numpy'
-        if hasattr(self.y, "iloc"):
-            ty = 'pandas'
-        sy = self.y.shape
-
-        format = dict(name=self.__class__.__name__, tx=tx, sx=sx, ty=ty, sy=sy)
-        return '{name}(X={tx}(shape={sx}), y={ty}(shape={sy}))'.format(**format)
-
-    @property
-    def shape(self):
-        return len(self.X), None
+from .xydata import XyData
 
 
 class XyAdapterStub(object):
@@ -223,10 +148,11 @@ def XyAdapterFactory(klass):
             return (isinstance(self, other.__class__) or isinstance(
                 other, self.__class__)) and self.__dict__ is other.__dict__
 
-        def _check_ofmt(self, X):
-            return 'pandas' if hasattr(X, "iloc") else 'numpy'
-
         def _joinXy(self, X, y, ofmt):
+
+            if type(X) == XyData:
+                # the input y replaced by what is got from the transformer
+                X, y = X 
 
             if ofmt == 'pandas':
 
@@ -254,27 +180,41 @@ def XyAdapterFactory(klass):
                         X = pd.DataFrame(X, columns=feature_names_out)
                         X = X.infer_objects()
 
-            if y is not None:
-                X = XyData(X, y)
+                if y is not None and hasattr(y, "iloc") is False:
+                    yt = y
+                    if hasattr(y, "to_frame"):
+                        yt = y.to_frame()
+                    elif sparse.issparse(y):
+                        # Sparse already is 2-d
+                        pass
+                    else:
+                        yt = np.atleast_2d(y)
+                    n_features = _num_features(yt)
+                    feature_names_out = np.asarray(
+                        [f"y{i}" for i in range(n_features)], dtype=object)
 
-            return X
+                    if sparse.issparse(y):
+                        y = pd.DataFrame.sparse.from_spmatrix(
+                            y, columns=feature_names_out)
+                        y = y.infer_objects()
+                    else:
+                        y = pd.DataFrame(y, columns=feature_names_out)
+                        y = y.infer_objects()
+                    y = y.squeeze()
+
+                    # Sync the indices of X and y. y takes on the indices of x
+                    # assuming they are in sync
+                    y = y.reset_index(drop=True).reindex_like(X)
+
+            return XyData(X, y)
 
         def _call(self, method, X, y=None, requires_y=True, join_y=True,
                   reset=True, **params):
 
-            if type(X) == XyData:
+            input_type = type(X)
+
+            if input_type == XyData:
                 X, y = X
-
-            Xt = X
-            if hasattr(X, "to_frame"):
-                Xt = X.to_frame()
-            elif sparse.issparse(X):
-                # Sparse already is 2-d
-                pass
-            else:
-                Xt = np.atleast_2d(X)
-
-            ofmt = self._check_ofmt(X)
 
             try:
                 klass = self.__class__
@@ -288,7 +228,8 @@ def XyAdapterFactory(klass):
             finally:
                 self.__class__ = klass  # type: ignore
 
-            if join_y:
+            if join_y and input_type == XyData:
+                ofmt = 'pandas' if hasattr(X, "iloc") else 'numpy'
                 ret = self._joinXy(ret, y, ofmt)
 
             return ret
@@ -300,7 +241,10 @@ def XyAdapterFactory(klass):
             except AttributeError:
                 pass
             try:
-                return self.get_feature_names()
+                with warnings.catch_warnings():
+                    warnings.simplefilter(action='ignore',
+                                          category=FutureWarning)
+                    return self.get_feature_names()
             except AttributeError:
                 pass
             return None

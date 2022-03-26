@@ -109,6 +109,7 @@ class FunctionTransformer(_FunctionTransformer):
     def fit(self, X, y=None, **fit_params):
         super().fit(X, y, **fit_params)
         if self.fit_fn is not None:
+            self.fitted_ = True
             self.kw_args = self.kw_args if self.kw_args else {}
             ret = self.fit_fn(X, y)
             if not isinstance(ret, dict):
@@ -139,3 +140,11 @@ class FunctionTransformer(_FunctionTransformer):
         used_features = [c for c in input_features if c in transformed_features]
 
         return used_features
+
+    def __sklearn_is_fitted__(self):
+        # The base class assumes that FunctionTransformer is stateless. In this
+        # class we permit a fit_fn that is stateful.
+        fitted = [
+            v for v in vars(self) if v.endswith("_") and not v.startswith("__")
+        ]
+        return self.fit_fn is None or len(fitted)

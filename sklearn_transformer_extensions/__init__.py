@@ -1,6 +1,7 @@
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
-from .xyadapter import XyAdapter, XyAdapterBase, XyData
+from .xyadapter import XyAdapter, XyAdapterBase
+from .xydata import XyData
 
 __all__ = [
     "compose",

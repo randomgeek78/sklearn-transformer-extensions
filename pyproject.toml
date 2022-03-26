@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sklearn-transformer-extensions"
-version = "0.2.1"
+version = "0.2.2"
 description = """\
 Some scikit-learn transformer extensions to make using pandas dataframes in \
 scikit-learn pipelines easier."""
@@ -12,13 +12,9 @@ python = "^3.8"
 scikit-learn = "^1.0.0"
 numpy = "*"
 pandas = {version = "*", optional = true}
-xgboost = "^1.5.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"
-ipython = "*"
-ipdb = "*"
-jupyter = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
