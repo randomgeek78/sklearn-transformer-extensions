@@ -60,6 +60,9 @@ class Pipeline(_Pipeline):
     >>> X = JUNK_FOOD_DOCS
     >>> y = ["pizza" in x for x in JUNK_FOOD_DOCS]
     >>> Xy = XyData(X, y)
+
+    Wrapping XyAdapter around transformers enables them to handle XyData
+    objects.
     >>> pipe = Pipeline(steps=[
     ...     ("vect", XyAdapter(CountVectorizer)()),
     ...     ("clf", XyAdapter(LogisticRegression)()),
@@ -85,6 +88,25 @@ class Pipeline(_Pipeline):
     >>> pipe[0].get_feature_names_out()
     array(['beer', 'burger', 'coke', 'copyright', 'pizza', 'the'],
           dtype=object)
+    >>> pipe.__class__
+    <class 'sklearn_transformer_extensions.pipeline.Pipeline'>
+    >>> for cls in pipe.__class__.mro():
+    ...     print(cls)
+    <class 'sklearn_transformer_extensions.pipeline.Pipeline'>
+    <class 'sklearn.pipeline.Pipeline'>
+    <class 'sklearn.utils.metaestimators._BaseComposition'>
+    <class 'sklearn.base.BaseEstimator'>
+    <class 'object'>
+    >>> pipe[0].__class__
+    <class 'sklearn_transformer_extensions.xyadapter.XyAdapterFactory.<locals>.CountVectorizer'>
+    >>> for cls in pipe[0].__class__.mro():
+    ...     print(cls)
+    <class 'sklearn_transformer_extensions.xyadapter.XyAdapterFactory.<locals>.CountVectorizer'>
+    <class 'sklearn.feature_extraction.text.CountVectorizer'>
+    <class 'sklearn.feature_extraction.text._VectorizerMixin'>
+    <class 'sklearn.base.BaseEstimator'>
+    <class 'sklearn_transformer_extensions.xyadapter.XyAdapterBase'>
+    <class 'object'>
 
     """
 
