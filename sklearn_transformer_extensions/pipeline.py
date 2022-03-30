@@ -135,7 +135,7 @@ def make_pipeline(*steps, memory=None, verbose=False, xy_adapter=False):
     --------
     >>> from sklearn.naive_bayes import GaussianNB
     >>> from sklearn.preprocessing import StandardScaler
-    >>> from sklearn.pipeline import make_pipeline
+    >>> from sklearn_transformer_extensions.pipeline import make_pipeline
     >>> make_pipeline(StandardScaler(), GaussianNB(priors=None))
     Pipeline(steps=[('standardscaler', StandardScaler()),
                     ('gaussiannb', GaussianNB())])
