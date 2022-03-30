@@ -183,3 +183,10 @@ Please checkout the source documentation for more details on `ColumnTransformer`
 The package's core functionality has been extensively tested by extending
 scikit-learn's tests for `Pipeline`, `ColumnTransformer` and
 `FunctionTransformer`.
+
+## Installation
+Install the package with `pip`:
+```python
+pip install sklearn_transformer_extensions
+```
+
