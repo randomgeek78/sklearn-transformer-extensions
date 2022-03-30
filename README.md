@@ -173,10 +173,11 @@ Since both the filter and the estimator are part of the same pipeline, we were
 able to jointly optimize the parameters for both. 
 
 In addition to extending the interface to scikit-learn's estimators and
-transformers so it an XyData object, the adapted object also outputs a pandas
-`DataFrame` if the input is a pandas `DataFrame`. It relies on the newly
-introduced `get_feature_names_out` interface in order to get output
-`DataFrame`'s column names.
+transformers so it also accepts an XyData object, a class that wraps
+`XyAdapter` automatically outputs a properly formatted pandas `DataFrame` with
+the right set of column names. It relies on the newly introduced
+`get_feature_names_out` interface in order to get output `DataFrame`'s column
+names.
 
 Please checkout the source documentation for more details on `ColumnTransformer`, `FunctionTransformer` and other extensions.
 
